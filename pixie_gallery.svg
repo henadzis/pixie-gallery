@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 32" width="128" height="128">
+  <!-- Внешний темный контур -->
+  <path fill="#161233" d="
+    M9 9h3v2h-3z M13 8h4v3h-4z M18 7h7v4h-7z M27 8h4v3h-4z
+    M7 11h26v1H7z M6 12h28v1H6z M5 13h30v14H5z M6 27h28v1H6z M7 28h26v1H7z
+  " />
+
+  <!-- Верхние элементы управления (крутилки, кнопка, башмак) -->
+  <path fill="#e62058" d="M10 9h2v2h-2z" />
+  <path fill="#ffd000" d="M10 9h1v1h-1z" />
+  <path fill="#00d2ff" d="M14 9h2v2h-2z" />
+  <path fill="#ffffff" d="M14 9h1v1h-1z" />
+  <path fill="#ffd000" d="M19 8h5v1h-5z M19 9h5v2h-5z" />
+  <path fill="#ff0077" d="M22 9h2v2h-2z" />
+  <path fill="#e62058" d="M28 9h2v2h-2z" />
+  <path fill="#ffd000" d="M28 9h2v1h-2z" />
+
+  <!-- Верхняя панель камеры (желтый блок с деталями) -->
+  <path fill="#ffb703" d="M7 12h26v4H7z" />
+  <path fill="#ffd000" d="M7 12h18v2H7z M28 12h5v3h-5z" />
+  <path fill="#00d2ff" d="M7 12h6v4H7z" />
+  <path fill="#ffffff" d="M7 12h5v1H7z M7 13h1v3H7z" />
+  <path fill="#ff0077" d="M10 13h2v2h-2z" />
+  <path fill="#99004d" d="M14 13h2v2h-2z" />
+  
+  <!-- Видоискатель справа -->
+  <path fill="#161233" d="M27 12h5v4h-5z" />
+  <path fill="#00f0ff" d="M28 13h3v2h-3z" />
+  <path fill="#ffffff" d="M28 13h1v1h-1z" />
+
+  <!-- Линия раздела верхней и нижней части -->
+  <path fill="#161233" d="M7 16h26v1H7z" />
+
+  <!-- Нижняя панель: левый розово-синий блок хвата -->
+  <path fill="#e6007a" d="M7 17h5v9H7z" />
+  <path fill="#ff4da6" d="M7 17h1v9H7z M8 22h1v3H8z" />
+  <path fill="#0066cc" d="M11 17h3v9h-3z" />
+  <path fill="#00b4d8" d="M11 17h1v9h-1z" />
+
+  <!-- Нижняя панель: правый оранжевый блок -->
+  <path fill="#fb6107" d="M25 17h8v9h-8z" />
+  <path fill="#ff8500" d="M27 17h6v3h-6z" />
+  <path fill="#e6007a" d="M31 17h2v9h-2z" />
+  <path fill="#ffd000" d="M29 18h3v1h-3z" />
+
+  <!-- Объектив: Внешний черный контур -->
+  <path fill="#161233" d="
+    M17 14h6v1h-6z M15 15h10v1H15z M14 16h12v1H14z 
+    M13 17h14v6H13z M14 23h12v1H14z M15 24h10v1H15z M17 25h6v1h-6z
+    M27 19h2v2h-2z
+  " />
+
+  <!-- Объектив: Наружное кольцо (бирюзовый градиент) -->
+  <path fill="#00f0ff" d="
+    M17 15h6v1h-6z M15 16h10v1H15z M14 17h12v6H14z 
+    M15 23h10v1H15z M17 24h6v1h-6z
+  " />
+  <path fill="#ffffff" d="
+    M17 15h4v1h-4z M15 16h2v1h-2z M14 17h1v3h-1z
+  " />
+  <path fill="#0099cc" d="
+    M23 16h2v1h-2z M25 17h1v5h-1z M23 23h2v1h-2z M17 24h6v1h-6z
+  " />
+
+  <!-- Объектив: Внутренняя черная кайма линзы -->
+  <path fill="#161233" d="
+    M18 17h4v1h-4z M16 18h8v4h-8z M18 22h4v1h-4z
+  " />
+
+  <!-- Объектив: Сама линза (глубокий бирюзово-синий) -->
+  <path fill="#00c8e6" d="
+    M18 18h4v4h-4z M17 19h6v2h-6z
+  " />
+  <path fill="#004d66" d="
+    M19 19h2v2h-2z M20 20h2v1h-2z
+  " />
+
+  <!-- Блики на линзе -->
+  <path fill="#ffffff" d="
+    M18 19h2v1h-2z M18 20h1v1h-1z M21 21h1v1h-1z
+  " />
+
+  <!-- Нижний кант и подошва корпуса -->
+  <path fill="#00e5ff" d="M7 26h26v1H7z" />
+  <path fill="#161233" d="M7 27h26v1H7z" />
+</svg>
