@@ -1,11 +1,11 @@
 name: pixie-gallery
 services:
   pixie-gallery:
-    image: python:3.12-slim
+    build: .
+    image: pixie-gallery:latest
     container_name: pixie-gallery
     restart: unless-stopped
     working_dir: /code
-    command: ["sh", "/code/app/start.sh"]
     ports:
       - "8085:8000"
     volumes:
