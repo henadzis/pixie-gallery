@@ -1,0 +1,1591 @@
+<!DOCTYPE html>
+<html lang="ru" id="html-root" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{ title }}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Montserrat:wght@300;400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body.font-montserrat { font-family: 'Montserrat', sans-serif; }
+    body.font-inter { font-family: 'Inter', sans-serif; }
+    body.font-garamond { font-family: 'Cormorant Garamond', serif; }
+    .serif-title { font-family: 'Cormorant Garamond', serif; }
+
+    /* Строчная сетка с обрезкой 4:3 (Слева направо) */
+    .photo-grid {
+      display: grid;
+      grid-template-columns: repeat(var(--user-cols, 4), minmax(0, 1fr));
+      gap: var(--grid-gap, 1.25rem);
+      align-items: start;
+    }
+    @media (max-width: 1024px) {
+      .photo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+    }
+    @media (max-width: 640px) {
+      .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+    }
+
+/* Умная строчная сетка без обрезки */
+    .justified-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--grid-gap, 1.25rem);
+    }
+    .justified-grid::after {
+      content: "";
+      flex-grow: 999999999;
+      min-width: 30%;
+      height: 0;
+    }
+    .justified-item {
+      /* Высота строки теперь зависит от выбранных колонок! 3=400px, 4=300px, 5=240px, 6=180px */
+      height: calc(1200px / var(--user-cols, 4)); 
+      flex-grow: 1;
+      position: relative;
+    }
+    .justified-item img {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      /* contain гарантирует, что фото влезет целиком без обрезки */
+      object-fit: contain; 
+    }
+    @media (max-width: 768px) {
+      .justified-item { height: calc(800px / var(--user-cols, 4)); }
+    }
+
+    .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+    .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+    .sidebar-scroll::-webkit-scrollbar-thumb { background: rgba(150,150,150,0.3); border-radius: 2px; }
+
+    #lb-image {
+      transition: transform 0.15s ease-out;
+      transform-origin: center center;
+      will-change: transform;
+    }
+    #lb-image.dragging {
+      transition: none !important;
+      cursor: grabbing !important;
+    }
+  </style>
+</head>
+<body id="body-tag" class="font-montserrat h-screen flex flex-col overflow-hidden bg-[#faf9f6] text-[#1c1c1c] dark:bg-[#121212] dark:text-[#e0e0e0] transition-colors duration-300 selection:bg-stone-300 dark:selection:bg-stone-700">
+
+  <!-- АВТОРИЗАЦИЯ -->
+  <div id="login-screen" class="fixed inset-0 z-50 hidden bg-[#faf9f6] dark:bg-[#121212] flex items-center justify-center p-6">
+    <div class="max-w-sm w-full bg-white dark:bg-[#1e1e1e] border border-stone-200 dark:border-stone-800 p-8 shadow-sm text-center relative">
+      <div class="absolute top-4 right-4">
+        <button type="button" onclick="toggleLanguage()" id="login-lang-btn" class="text-[11px] tracking-[0.15em] uppercase px-2 py-1 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 transition">RU</button>
+      </div>
+      <h1 class="serif-title text-3xl tracking-[0.2em] uppercase mb-2 mt-2" id="login-modal-title">{{ title }}</h1>
+      <p class="text-xs tracking-[0.15em] uppercase text-stone-400 mb-8" data-i18n="login_subtitle">Клиентский вход в галерею</p>
+      <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
+        <div>
+          <label class="block text-[11px] tracking-[0.15em] uppercase text-stone-500 mb-1" data-i18n="login_user">Логин</label>
+          <input id="login-user" type="text" required class="w-full border border-stone-300 dark:border-stone-700 bg-transparent px-3.5 py-2.5 text-sm focus:outline-none focus:border-stone-800 dark:focus:border-stone-300" />
+        </div>
+        <div>
+          <label class="block text-[11px] tracking-[0.15em] uppercase text-stone-500 mb-1" data-i18n="login_pass">Пароль</label>
+          <input id="login-pass" type="password" required class="w-full border border-stone-300 dark:border-stone-700 bg-transparent px-3.5 py-2.5 text-sm focus:outline-none focus:border-stone-800 dark:focus:border-stone-300" />
+        </div>
+        <p id="login-error" class="text-xs text-red-600 hidden"></p>
+        <button type="submit" class="w-full bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white py-3 text-xs tracking-[0.2em] uppercase transition" data-i18n="login_btn">Войти</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ШАПКА -->
+  <header class="flex-none z-30 bg-[#faf9f6]/90 dark:bg-[#121212]/90 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
+    <div class="max-w-full mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-2">
+      <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
+        <button onclick="toggleSidebarCollapse()" class="hidden md:flex items-center justify-center w-8 h-8 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 text-stone-600 dark:text-stone-300 transition" title="Toggle Sidebar">
+          <svg id="collapse-icon" class="w-4 h-4 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+        <button onclick="toggleMobileSidebar()" class="md:hidden p-2 text-stone-600 dark:text-stone-300">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+
+        <button onclick="showHome()" class="inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 text-xs uppercase transition bg-transparent text-stone-800 dark:text-stone-200 shrink-0">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V9.5z"/>
+          </svg>
+          <span class="hidden sm:inline" data-i18n="nav_home">На главную</span>
+        </button>
+
+        <button onclick="showHome()" id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium hover:opacity-70 transition text-left ml-1 truncate">
+          {{ title }}
+        </button>
+      </div>
+
+      <div class="flex items-center space-x-3 md:space-x-4 text-xs tracking-[0.12em] uppercase shrink-0">
+        <button onclick="toggleGridRatio()" id="ratio-toggle-btn" class="hidden lg:inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Grid Aspect Ratio">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span id="ratio-toggle-label">Оригинал</span>
+        </button>
+
+        <div class="hidden sm:flex items-center space-x-1.5">
+          <span class="text-stone-400 hidden xl:inline" data-i18n="cols_label">Столбцы:</span>
+          <select id="header-cols-select" onchange="changeGridColumns(this.value)" class="border border-stone-300 dark:border-stone-700 bg-transparent px-2 py-1 text-xs focus:outline-none dark:bg-[#181818]">
+            <option value="3" data-i18n="cols_3">3 в ряд</option>
+            <option value="4" selected data-i18n="cols_4">4 в ряд</option>
+            <option value="5" data-i18n="cols_5">5 в ряд</option>
+            <option value="6" data-i18n="cols_6">6 в ряд</option>
+          </select>
+        </div>
+
+        <button onclick="toggleLanguage()" id="header-lang-btn" class="border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs font-medium transition">
+          RU
+        </button>
+
+        <span id="current-user-badge" class="text-stone-400 hidden xl:inline"></span>
+
+        <button id="settings-btn" onclick="openSettingsModal()" class="hidden inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span class="hidden md:inline" data-i18n="nav_settings">Настройки</span>
+        </button>
+
+        <button onclick="handleLogout()" class="text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition" data-i18n="nav_logout">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- МАКЕТ -->
+  <div class="flex-grow flex w-full overflow-hidden relative">
+
+    <!-- САЙДБАР С ДЕРЕВОМ ПАПОК -->
+    <aside id="sidebar" class="fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 flex-none w-80 bg-white dark:bg-[#161616] border-r border-stone-200 dark:border-stone-800 flex flex-col transition-all duration-300 z-40 md:z-20">
+      <div class="p-4 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
+        <span class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="sidebar_title">Структура диска</span>
+        <button onclick="toggleMobileSidebar()" class="md:hidden text-stone-400 hover:text-black dark:hover:text-white p-1">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div id="sidebar-tree" class="sidebar-scroll flex-grow overflow-y-auto p-4 space-y-4 text-xs"></div>
+    </aside>
+
+    <div id="sidebar-overlay" onclick="toggleMobileSidebar()" class="fixed inset-0 z-30 bg-black/40 hidden md:hidden"></div>
+
+    <!-- ПРАВАЯ ОБЛАСТЬ -->
+    <main id="main-scroll-area" class="flex-grow min-w-0 overflow-y-auto h-full scroll-smooth">
+
+      <!-- ГЛАВНЫЙ ЭКРАН -->
+      <div id="home-view" class="max-w-7xl w-full mx-auto px-6 py-12">
+        <div class="mb-10">
+          <h2 class="serif-title text-3xl md:text-5xl tracking-widest mb-2" data-i18n="home_title">Хроника архива</h2>
+          <p class="text-xs tracking-[0.2em] uppercase text-stone-400" data-i18n="home_subtitle">Все альбомы и подпапки вашего архива</p>
+        </div>
+        <div id="years-container" class="space-y-16"></div>
+      </div>
+
+      <!-- ЭКРАН ОТКРЫТОГО АЛЬБОМА -->
+      <section id="album-view" class="hidden pb-20">
+        <div class="relative h-[42vh] min-h-[300px] w-full bg-stone-900 overflow-hidden">
+          <img id="album-hero-img" src="" alt="" class="w-full h-full object-cover opacity-75 scale-105 transition-transform duration-1000" />
+          <div class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white px-4 text-center">
+            <p id="album-year-label" class="text-xs tracking-[0.3em] uppercase mb-3 opacity-80"></p>
+            <h1 id="album-title" class="serif-title text-3xl md:text-5xl font-normal tracking-wider mb-4"></h1>
+            <p id="album-count" class="text-xs tracking-[0.2em] uppercase opacity-80 mb-6"></p>
+            <div class="flex flex-wrap items-center justify-center gap-3">
+              <a id="album-zip-btn" href="#" class="bg-white/95 hover:bg-white text-stone-900 px-6 py-3 text-xs tracking-[0.2em] uppercase transition shadow-md inline-flex items-center gap-2">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span data-i18n="download_album_zip">Скачать весь альбом (ZIP)</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto px-4 md:px-10 pt-8 pb-2">
+          <div class="flex flex-wrap items-center justify-between gap-4 border-b border-stone-200 dark:border-stone-800 pb-4">
+            <div class="flex flex-wrap items-center gap-3 text-xs tracking-[0.15em] uppercase">
+              <button id="tab-all-photos" onclick="setFavoritesFilter(false)" class="px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition" data-i18n="tab_all">Все кадры</button>
+              <button id="tab-fav-photos" onclick="setFavoritesFilter(true)" class="px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                <span><span data-i18n="tab_fav">Избранное</span> (<span id="fav-counter-badge">0</span>)</span>
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3 text-xs tracking-[0.12em] uppercase">
+              <div class="flex items-center space-x-2">
+                <span class="text-stone-400" data-i18n="sort_label">Сортировка:</span>
+                <select id="album-sort-select" onchange="changeAlbumSort(this.value)" class="border border-stone-300 dark:border-stone-700 bg-transparent dark:bg-[#181818] px-2.5 py-1.5 text-xs focus:outline-none">
+                  <option value="name_asc" data-i18n="sort_name_asc">Имя (А–Я)</option>
+                  <option value="name_desc" data-i18n="sort_name_desc">Имя (Я–А)</option>
+                  <option value="date_asc" data-i18n="sort_date_asc">Дата (сначала старые)</option>
+                  <option value="date_desc" data-i18n="sort_date_desc">Дата (сначала новые)</option>
+                </select>
+              </div>
+
+              <div id="fav-actions-bar" class="hidden flex flex-wrap items-center gap-2">
+                <button onclick="copyFavoriteFilenames()" class="inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 bg-white dark:bg-[#181818] px-3.5 py-1.5 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  <span data-i18n="copy_fav_names">Скопировать имена</span>
+                </button>
+                <a id="album-fav-zip-btn" href="#" class="inline-flex items-center gap-1.5 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-3.5 py-1.5 transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span data-i18n="download_fav_zip">Скачать избранное (ZIP)</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="max-w-[1600px] mx-auto px-4 md:px-10 py-8">
+          <div id="photos-grid" class="photo-grid"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- LIGHTBOX -->
+  <div id="lightbox" class="fixed inset-0 z-50 hidden bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md flex flex-col justify-between p-4 md:p-6 select-none">
+    <div class="flex flex-wrap justify-between items-center gap-2 text-stone-600 dark:text-stone-300 text-xs tracking-[0.14em] uppercase z-20">
+      <div class="flex items-center gap-3">
+        <span id="lb-counter" class="font-medium"></span>
+        <span id="lb-res-badge" class="text-[10px] tracking-[0.15em] px-2 py-0.5 border border-stone-300 dark:border-stone-700 text-stone-500 dark:text-stone-400">1200PX CACHE</span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 md:gap-5">
+        <button id="lb-fav-btn" onclick="toggleFavoriteCurrentLightbox()" class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 transition">
+          <span id="lb-fav-icon" class="inline-flex"></span>
+          <span id="lb-fav-label">В избранное</span>
+        </button>
+
+        <button onclick="toggleZoom()" id="lb-zoom-btn" class="inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 transition">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+          </svg>
+          <span id="zoom-label" data-i18n="zoom_in">Оригинал / Зум</span>
+        </button>
+
+        <a id="lb-download" href="#" download class="inline-flex items-center gap-1.5 hover:text-black dark:hover:text-white transition border-b border-stone-400 pb-0.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          <span data-i18n="download_orig">Скачать оригинал</span>
+        </a>
+
+        <button onclick="closeLightbox()" class="p-1.5 hover:text-black dark:hover:text-white transition" title="Close (Esc)">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="relative flex-grow flex items-center justify-center my-2 overflow-hidden" id="lb-image-container">
+      <button onclick="stepPhoto(-1)" class="absolute left-2 md:left-6 p-3 text-stone-400 hover:text-black dark:hover:text-white transition z-20 bg-white/60 dark:bg-black/40 rounded-full">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+
+      <img id="lb-image" src="" alt="" draggable="false" class="max-h-[78vh] max-w-[88vw] object-contain shadow-sm cursor-zoom-in" />
+
+      <button onclick="stepPhoto(1)" class="absolute right-2 md:right-6 p-3 text-stone-400 hover:text-black dark:hover:text-white transition z-20 bg-white/60 dark:bg-black/40 rounded-full">
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+
+    <div class="text-center space-y-1.5 z-20">
+      <div id="lb-filename" class="text-xs tracking-[0.15em] text-stone-500 uppercase"></div>
+      <div id="lb-exif" class="text-[11px] tracking-[0.12em] text-stone-400 flex flex-wrap items-center justify-center gap-x-4 gap-y-1"></div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО НАСТРОЕК -->
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-2xl w-full max-h-[92vh] overflow-y-auto p-6 md:p-8 shadow-xl space-y-8">
+      <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-4">
+        <h2 class="serif-title text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки интерфейса</h2>
+        <button onclick="closeSettingsModal()" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="space-y-4">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_appearance">Оформление и сетка</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gallery_name">Заголовок галереи (название)</label>
+            <div class="flex gap-2">
+              <input id="pref-gallery-title" type="text" class="flex-grow border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+              <button onclick="saveGalleryTitleOnly()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+            </div>
+            <span id="title-saved-msg" class="text-xs text-green-600 hidden mt-1" data-i18n="msg_saved">✓ Сохранено</span>
+          </div>
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_theme">Цветовая тема</label>
+            <select id="pref-theme" onchange="changeTheme(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="light" data-i18n="theme_light">Светлая</option>
+              <option value="dark" data-i18n="theme_dark">Темная</option>
+            </select>
+          </div>
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_font">Шрифт</label>
+            <select id="pref-font" onchange="changeFont(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="montserrat">Montserrat</option>
+              <option value="inter">Inter</option>
+              <option value="garamond">Garamond</option>
+            </select>
+          </div>
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gap">Отступы между миниатюрами</label>
+            <select id="pref-gap" onchange="changeGridGap(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="small" data-i18n="gap_small">Маленький</option>
+              <option value="medium" data-i18n="gap_medium">Средний</option>
+              <option value="large" data-i18n="gap_large">Большой</option>
+            </select>
+          </div>
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_ratio">Пропорции фото в сетке</label>
+            <select id="pref-ratio" onchange="changeGridRatio(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="original" data-i18n="ratio_original">Без обрезки (оригинальные)</option>
+              <option value="crop" data-i18n="ratio_crop">Ровная плитка (4:3)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_view_params">Параметры просмотра и загрузки</h3>
+        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+          <div>
+            <div class="text-sm font-medium" data-i18n="opt_exif_title">Отображать параметры съемки (EXIF)</div>
+            <div class="text-xs text-stone-500" data-i18n="opt_exif_desc">Камера, объектив, диафрагма, выдержка, ISO</div>
+          </div>
+          <input id="opt-show-exif" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100" />
+        </label>
+        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+          <div>
+            <div class="text-sm font-medium" data-i18n="opt_zip_title">Разрешить скачивание альбомов ZIP</div>
+            <div class="text-xs text-stone-500" data-i18n="opt_zip_desc">Кнопки загрузки архивов для клиентов</div>
+          </div>
+          <input id="opt-allow-zip" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100" />
+        </label>
+      </div>
+
+      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_filters">Фильтрация папок и файлов</h3>
+        <div class="space-y-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+          <div>
+            <label class="block text-xs font-medium mb-1" data-i18n="filter_hidden">Скрыть папки (через запятую):</label>
+            <input id="opt-hidden-folders" type="text" placeholder="Private, Temp" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1" data-i18n="filter_exts">Исключить расширения файлов (через запятую):</label>
+            <input id="opt-exclude-exts" type="text" placeholder=".cr2, .cr3, .dng, .tif" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium mb-1" data-i18n="filter_masks">Исключить маски имен файлов (через запятую):</label>
+            <input id="opt-exclude-masks" type="text" placeholder="*_small.*, *_smal.*, ._*" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <button onclick="saveGlobalSettings(true)" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_apply_filters">Применить фильтры</button>
+            <span id="filter-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-3 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_cache">Кэш и миниатюры</h3>
+          <span id="cache-size-badge" class="text-xs font-semibold text-stone-600 dark:text-stone-400">...</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <button onclick="triggerPregenerate()" id="pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-5 py-2.5 text-xs tracking-[0.18em] uppercase transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span data-i18n="btn_pregen">Создать превью (400px / 1200px)</span>
+          </button>
+          <button onclick="cancelPregenerate()" id="pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.18em] uppercase transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
+            <span data-i18n="btn_stop">Остановить</span>
+          </button>
+          <button onclick="clearCacheFiles()" class="inline-flex items-center gap-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs tracking-[0.18em] uppercase transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span data-i18n="btn_clear_cache">Очистить кэш</span>
+          </button>
+          <span id="pregen-status-text" class="text-xs text-stone-500"></span>
+        </div>
+        <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
+          <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
+        <div id="users-list" class="space-y-2 text-xs"></div>
+
+        <form onsubmit="handleSaveUser(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
+          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" data-i18n="user_form_title">Добавить или отредактировать пользователя</div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input id="new-u-name" type="text" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <input id="new-u-pass" type="password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <select id="new-u-role" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="user" data-i18n="role_user">Клиент</option>
+              <option value="admin" data-i18n="role_admin">Администратор</option>
+            </select>
+          </div>
+
+          <div class="space-y-2">
+            <div class="flex items-center space-x-4 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
+              <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                <input type="radio" name="access-mode" value="allow" checked onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
+                <span data-i18n="mode_allow">Разрешенные папки</span>
+              </label>
+              <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                <input type="radio" name="access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
+                <span data-i18n="mode_deny">Запрещенные папки</span>
+              </label>
+            </div>
+            <div id="albums-checkbox-list" class="max-h-40 overflow-y-auto border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
+          </div>
+
+          <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_user">Сохранить пользователя</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const I18N = {
+      ru: {
+        login_subtitle: 'Клиентский вход в галерею',
+        login_user: 'Логин',
+        login_pass: 'Пароль',
+        login_btn: 'Войти',
+        login_err: 'Неверный логин или пароль',
+        nav_home: 'На главную',
+        nav_settings: 'Настройки',
+        nav_logout: 'Выйти',
+        cols_label: 'Столбцы:',
+        cols_3: '3 в ряд',
+        cols_4: '4 в ряд',
+        cols_5: '5 в ряд',
+        cols_6: '6 в ряд',
+        ratio_btn_orig: 'Оригинал',
+        ratio_btn_crop: 'Плитка 4:3',
+        sidebar_title: 'Структура диска',
+        home_title: 'Хроника архива',
+        home_subtitle: 'Все альбомы и подпапки вашего архива',
+        no_albums: 'Нет доступных альбомов',
+        folders_count: 'папок',
+        photos_count: 'фото',
+        photos_upper: 'ФОТОГРАФИЙ',
+        download_album_zip: 'Скачать весь альбом (ZIP)',
+        tab_all: 'Все кадры',
+        tab_fav: 'Избранное',
+        sort_label: 'Сортировка:',
+        sort_name_asc: 'Имя (А–Я)',
+        sort_name_desc: 'Имя (Я–А)',
+        sort_date_asc: 'Дата (сначала старые)',
+        sort_date_desc: 'Дата (сначала новые)',
+        copy_fav_names: 'Скопировать имена',
+        download_fav_zip: 'Скачать избранное (ZIP)',
+        no_photos: 'Нет фотографий для отображения',
+        fav_add: 'В избранное',
+        fav_in: 'В избранном',
+        zoom_in: 'Оригинал / Зум',
+        zoom_reset: 'Сбросить зум',
+        badge_preview: '1200PX КЭШ',
+        badge_loading_orig: 'ЗАГРУЗКА ОРИГИНАЛА...',
+        badge_orig: 'ОРИГИНАЛ (ЗУМ)',
+        download_orig: 'Скачать оригинал',
+        settings_title: 'Настройки интерфейса',
+        settings_appearance: 'Оформление и сетка',
+        settings_gallery_name: 'Заголовок галереи (название)',
+        btn_apply: 'Применить',
+        msg_saved: '✓ Сохранено',
+        settings_theme: 'Цветовая тема',
+        theme_light: 'Светлая',
+        theme_dark: 'Темная',
+        settings_font: 'Шрифт',
+        settings_gap: 'Отступы между миниатюрами',
+        gap_small: 'Маленький',
+        gap_medium: 'Средний',
+        gap_large: 'Большой',
+        settings_ratio: 'Пропорции фото в сетке',
+        ratio_original: 'Без обрезки (оригинальные)',
+        ratio_crop: 'Ровная плитка (4:3)',
+        settings_view_params: 'Параметры просмотра и загрузки',
+        opt_exif_title: 'Отображать параметры съемки (EXIF)',
+        opt_exif_desc: 'Камера, объектив, диафрагма, выдержка, ISO',
+        opt_zip_title: 'Разрешить скачивание альбомов ZIP',
+        opt_zip_desc: 'Кнопки загрузки архивов для клиентов',
+        settings_filters: 'Фильтрация папок и файлов',
+        filter_hidden: 'Скрыть папки (через запятую):',
+        filter_exts: 'Исключить расширения файлов (через запятую):',
+        filter_masks: 'Исключить маски имен файлов (через запятую):',
+        btn_apply_filters: 'Применить фильтры',
+        settings_cache: 'Кэш и миниатюры',
+        cache_size: 'Размер кэша:',
+        btn_pregen: 'Создать превью (400px / 1200px)',
+        btn_stop: 'Остановить',
+        btn_clear_cache: 'Очистить кэш',
+        status_ready: 'Готово',
+        status_stopping: 'Остановка...',
+        status_scanning: 'Сканирование папок...',
+        settings_users: 'Пользователи и доступ к альбомам',
+        user_form_title: 'Добавить или отредактировать пользователя',
+        user_ph_login: 'Логин (существующий = правка)',
+        user_ph_pass: 'Пароль (пусто = без изменений)',
+        role_user: 'Клиент',
+        role_admin: 'Администратор',
+        mode_allow: 'Разрешенные папки',
+        mode_deny: 'Запрещенные папки',
+        mode_badge_allow: 'Доступ',
+        mode_badge_deny: 'Запрет',
+        all_albums_star: 'ВСЕ АЛЬБОМЫ (*)',
+        btn_edit: 'Править',
+        btn_delete: 'Удалить',
+        btn_save_user: 'Сохранить пользователя',
+        confirm_clear_cache: 'Вы уверены, что хотите очистить весь кэш миниатюр?',
+        alert_cache_cleared: 'Кэш очищен! Удалено файлов:',
+        confirm_del_user: 'Удалить пользователя',
+        copied_files: 'Скопировано имен файлов'
+      },
+      en: {
+        login_subtitle: 'Client Gallery Login',
+        login_user: 'Username',
+        login_pass: 'Password',
+        login_btn: 'Sign In',
+        login_err: 'Invalid username or password',
+        nav_home: 'Home',
+        nav_settings: 'Settings',
+        nav_logout: 'Logout',
+        cols_label: 'Columns:',
+        cols_3: '3 per row',
+        cols_4: '4 per row',
+        cols_5: '5 per row',
+        cols_6: '6 per row',
+        ratio_btn_orig: 'Original',
+        ratio_btn_crop: '4:3 Grid',
+        sidebar_title: 'Disk Structure',
+        home_title: 'Archive Chronicle',
+        home_subtitle: 'All albums and subfolders in your archive',
+        no_albums: 'No albums available',
+        folders_count: 'folders',
+        photos_count: 'photos',
+        photos_upper: 'PHOTOS',
+        download_album_zip: 'Download Full Album (ZIP)',
+        tab_all: 'All Photos',
+        tab_fav: 'Favorites',
+        sort_label: 'Sort by:',
+        sort_name_asc: 'Name (A–Z)',
+        sort_name_desc: 'Name (Z–A)',
+        sort_date_asc: 'Date (Oldest first)',
+        sort_date_desc: 'Date (Newest first)',
+        copy_fav_names: 'Copy Filenames',
+        download_fav_zip: 'Download Favorites (ZIP)',
+        no_photos: 'No photos to display',
+        fav_add: 'Favorite',
+        fav_in: 'Favorited',
+        zoom_in: 'Original / Zoom',
+        zoom_reset: 'Reset Zoom',
+        badge_preview: '1200PX CACHE',
+        badge_loading_orig: 'LOADING ORIGINAL...',
+        badge_orig: 'ORIGINAL (ZOOM)',
+        download_orig: 'Download Original',
+        settings_title: 'Interface Settings',
+        settings_appearance: 'Appearance & Grid',
+        settings_gallery_name: 'Gallery Title',
+        btn_apply: 'Apply',
+        msg_saved: '✓ Saved',
+        settings_theme: 'Color Theme',
+        theme_light: 'Light',
+        theme_dark: 'Dark',
+        settings_font: 'Font Family',
+        settings_gap: 'Grid Spacing',
+        gap_small: 'Small',
+        gap_medium: 'Medium',
+        gap_large: 'Large',
+        settings_ratio: 'Photo Grid Aspect Ratio',
+        ratio_original: 'Uncropped (Original Ratio)',
+        ratio_crop: 'Uniform Tiles (4:3)',
+        settings_view_params: 'Viewing & Download Options',
+        opt_exif_title: 'Show Camera EXIF Metadata',
+        opt_exif_desc: 'Camera model, lens, aperture, shutter speed, ISO',
+        opt_zip_title: 'Allow ZIP Album Downloads',
+        opt_zip_desc: 'Enable archive download buttons for clients',
+        settings_filters: 'Folder & File Filtering',
+        filter_hidden: 'Hide folders (comma-separated):',
+        filter_exts: 'Exclude file extensions (comma-separated):',
+        filter_masks: 'Exclude filename masks (comma-separated):',
+        btn_apply_filters: 'Apply Filters',
+        settings_cache: 'Cache & Thumbnails',
+        cache_size: 'Cache size:',
+        btn_pregen: 'Generate Previews (400px / 1200px)',
+        btn_stop: 'Stop',
+        btn_clear_cache: 'Clear Cache',
+        status_ready: 'Ready',
+        status_stopping: 'Stopping...',
+        status_scanning: 'Scanning folders...',
+        settings_users: 'Users & Album Permissions',
+        user_form_title: 'Add or Edit User',
+        user_ph_login: 'Username (existing = edit)',
+        user_ph_pass: 'Password (leave blank to keep)',
+        role_user: 'Client',
+        role_admin: 'Administrator',
+        mode_allow: 'Allowed Folders',
+        mode_deny: 'Blocked Folders',
+        mode_badge_allow: 'Allow',
+        mode_badge_deny: 'Deny',
+        all_albums_star: 'ALL ALBUMS (*)',
+        btn_edit: 'Edit',
+        btn_delete: 'Delete',
+        btn_save_user: 'Save User',
+        confirm_clear_cache: 'Are you sure you want to clear all cached thumbnails?',
+        alert_cache_cleared: 'Cache cleared! Files removed:',
+        confirm_del_user: 'Delete user',
+        copied_files: 'Copied filenames'
+      }
+    };
+
+    const SVG_ICONS = {
+      folder: `<svg class="w-3.5 h-3.5 inline-block mr-1.5 shrink-0 opacity-75" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+      calendar: `<svg class="w-3.5 h-3.5 inline-block mr-1.5 shrink-0 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+      heartOutline: `<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+      heartActive: `<svg class="w-4 h-4 text-red-500" viewBox="0 0 24 24" fill="rgba(239,68,68,0.2)" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`,
+      camera: `<svg class="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>`,
+      lens: `<svg class="w-3.5 h-3.5 inline-block mr-1 -mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="14.31" y1="8" x2="20.05" y2="17.94"/><line x1="9.69" y1="8" x2="21.17" y2="8"/><line x1="7.38" y1="12" x2="13.12" y2="2.06"/><line x1="9.69" y1="16" x2="3.95" y2="6.06"/><line x1="14.31" y1="16" x2="2.83" y2="16"/><line x1="16.62" y1="12" x2="10.88" y2="21.94"/></svg>`
+    };
+
+    let currentLang = localStorage.getItem('pixie_lang') || 'ru';
+    let currentUser = null;
+    let appSettings = { gallery_title: 'PHOTO ARCHIVE', show_exif: true, allow_zip_download: true, exclude_extensions: '', exclude_masks: '', hidden_folders: '' };
+    let allYears = [];
+    let allAlbumsCatalog = [];
+    let currentAlbumPath = '';
+    let currentAlbumPathEncoded = '';
+    let currentPhotos = [];
+    let displayedPhotos = [];
+    let showOnlyFavorites = false;
+    let currentSort = localStorage.getItem('pixie_sort') || 'name_asc';
+    let currentRatio = localStorage.getItem('pixie_ratio') || 'original';
+    let currentIndex = 0;
+    let pregenPollTimer = null;
+    let isSidebarCollapsed = false;
+    let currentUserEditMode = 'allow';
+    let suppressHashEvent = false;
+
+    let isZoomed = false;
+    let zoomScale = 1;
+    let panX = 0;
+    let panY = 0;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let didDragMove = false;
+
+    function t(key) {
+      return (I18N[currentLang] && I18N[currentLang][key]) || I18N.ru[key] || key;
+    }
+
+    function applyTranslations() {
+      document.documentElement.lang = currentLang;
+      document.getElementById('header-lang-btn').textContent = currentLang.toUpperCase();
+      document.getElementById('login-lang-btn').textContent = currentLang.toUpperCase();
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        el.textContent = t(key);
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        el.placeholder = t(key);
+      });
+      updateRatioButtonLabel();
+      if (allYears.length) {
+        renderSidebarTree(currentAlbumPath);
+        renderYears('ALL');
+      }
+      if (currentPhotos.length) {
+        document.getElementById('album-count').textContent = `${currentPhotos.length} ${t('photos_upper')}`;
+        renderAlbumPhotos();
+      }
+    }
+
+    function toggleLanguage() {
+      currentLang = currentLang === 'ru' ? 'en' : 'ru';
+      localStorage.setItem('pixie_lang', currentLang);
+      applyTranslations();
+    }
+
+    function applyPreferences() {
+      const savedTheme = localStorage.getItem('pixie_theme') || 'light';
+      const savedFont = localStorage.getItem('pixie_font') || 'montserrat';
+      const savedCols = localStorage.getItem('pixie_cols') || '4';
+      const savedGap = localStorage.getItem('pixie_gap') || 'medium';
+      currentRatio = localStorage.getItem('pixie_ratio') || 'original';
+      currentSort = localStorage.getItem('pixie_sort') || 'name_asc';
+
+      changeTheme(savedTheme, false);
+      changeFont(savedFont, false);
+      changeGridColumns(savedCols, false);
+      changeGridGap(savedGap, false);
+      changeGridRatio(currentRatio, false);
+
+      document.getElementById('pref-theme').value = savedTheme;
+      document.getElementById('pref-font').value = savedFont;
+      document.getElementById('header-cols-select').value = savedCols;
+      document.getElementById('pref-gap').value = savedGap;
+      document.getElementById('pref-ratio').value = currentRatio;
+      document.getElementById('album-sort-select').value = currentSort;
+      applyTranslations();
+    }
+
+    function changeTheme(theme, save = true) {
+      const html = document.getElementById('html-root');
+      if (theme === 'dark') {
+        html.classList.add('dark');
+        html.classList.remove('light');
+      } else {
+        html.classList.add('light');
+        html.classList.remove('dark');
+      }
+      if (save) localStorage.setItem('pixie_theme', theme);
+    }
+
+    function changeFont(font, save = true) {
+      const body = document.getElementById('body-tag');
+      body.className = body.className.replace(/font-\w+/g, '');
+      body.classList.add(`font-${font}`);
+      if (save) localStorage.setItem('pixie_font', font);
+    }
+
+    function changeGridColumns(cols, save = true) {
+      document.documentElement.style.setProperty('--user-cols', cols);
+      if (save) localStorage.setItem('pixie_cols', cols);
+    }
+
+    function changeGridGap(gapSize, save = true) {
+      let gapVal = '1.25rem';
+      if (gapSize === 'small') gapVal = '0.5rem';
+      if (gapSize === 'large') gapVal = '2.5rem';
+      document.documentElement.style.setProperty('--grid-gap', gapVal);
+      if (save) localStorage.setItem('pixie_gap', gapSize);
+    }
+
+    function updateRatioButtonLabel() {
+      const lbl = document.getElementById('ratio-toggle-label');
+      if (lbl) lbl.textContent = currentRatio === 'crop' ? t('ratio_btn_crop') : t('ratio_btn_orig');
+    }
+
+    function changeGridRatio(ratio, save = true) {
+      currentRatio = ratio;
+      const sel = document.getElementById('pref-ratio');
+      if (sel) sel.value = ratio;
+      updateRatioButtonLabel();
+      if (save) localStorage.setItem('pixie_ratio', ratio);
+      if (currentPhotos.length) renderAlbumPhotos();
+    }
+
+    function toggleGridRatio() {
+      changeGridRatio(currentRatio === 'original' ? 'crop' : 'original', true);
+    }
+
+    function changeAlbumSort(sortMode) {
+      currentSort = sortMode;
+      localStorage.setItem('pixie_sort', sortMode);
+      renderAlbumPhotos();
+    }
+
+    function toggleSidebarCollapse() {
+      const sidebar = document.getElementById('sidebar');
+      const icon = document.getElementById('collapse-icon');
+      isSidebarCollapsed = !isSidebarCollapsed;
+      if (isSidebarCollapsed) {
+        sidebar.style.width = '0px';
+        sidebar.style.overflow = 'hidden';
+        sidebar.style.borderRightWidth = '0px';
+        icon.style.transform = 'rotate(180deg)';
+      } else {
+        sidebar.style.width = '320px';
+        sidebar.style.borderRightWidth = '1px';
+        icon.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function toggleMobileSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('sidebar-overlay');
+      sidebar.classList.toggle('-translate-x-full');
+      overlay.classList.toggle('hidden');
+    }
+
+    function setUserMode(mode) {
+      currentUserEditMode = mode;
+    }
+
+    async function initApp() {
+      applyPreferences();
+      const meRes = await fetch('/api/me');
+      if (meRes.status === 401) {
+        document.getElementById('login-screen').classList.remove('hidden');
+        return;
+      }
+      const meData = await meRes.json();
+      currentUser = meData.user;
+      appSettings = meData.settings;
+
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('current-user-badge').textContent = currentUser.username;
+
+      if (appSettings.gallery_title) {
+        document.title = appSettings.gallery_title;
+        document.getElementById('header-brand-title').textContent = appSettings.gallery_title;
+        document.getElementById('login-modal-title').textContent = appSettings.gallery_title;
+      }
+
+      if (currentUser.role === 'admin') {
+        document.getElementById('settings-btn').classList.remove('hidden');
+      }
+      await loadStructure();
+      handleHashNavigation();
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('login-error');
+      errEl.classList.add('hidden');
+      const username = document.getElementById('login-user').value;
+      const password = document.getElementById('login-pass').value;
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      if (!res.ok) {
+        errEl.textContent = t('login_err');
+        errEl.classList.remove('hidden');
+        return;
+      }
+      await initApp();
+    }
+
+    async function handleLogout() {
+      await fetch('/api/logout', { method: 'POST' });
+      window.location.hash = '';
+      window.location.reload();
+    }
+
+    async function loadStructure() {
+      const res = await fetch('/api/structure');
+      if (!res.ok) return;
+      const data = await res.json();
+      allYears = data.years || [];
+      allAlbumsCatalog = data.all_albums_catalog || [];
+      renderSidebarTree(currentAlbumPath);
+      renderYears('ALL');
+    }
+
+    function safeYearId(yearStr) {
+      return 'year-sec-' + encodeURIComponent(yearStr).replace(/[^a-zA-Z0-9_-]/g, '_');
+    }
+
+    function navigateToYear(yearStr) {
+      showHomeView(true);
+      setHashSilently(`#year/${encodeURIComponent(yearStr)}`);
+      if (window.innerWidth < 768) {
+        const sidebar = document.getElementById('sidebar');
+        if (!sidebar.classList.contains('-translate-x-full')) toggleMobileSidebar();
+      }
+      setTimeout(() => {
+        const targetEl = document.getElementById(safeYearId(yearStr));
+        if (targetEl) {
+          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 60);
+    }
+
+    function renderSidebarTree(activePath = '') {
+      const treeEl = document.getElementById('sidebar-tree');
+      if (!allYears.length) {
+        treeEl.innerHTML = `<p class="text-stone-400">${t('no_albums')}</p>`;
+        return;
+      }
+
+      let html = '';
+      for (const y of allYears) {
+        const escapedYear = y.year.replace(/'/g, "\\'");
+        html += `
+          <div class="space-y-1">
+            <button onclick="navigateToYear('${escapedYear}')" class="w-full text-left font-semibold text-stone-800 dark:text-stone-200 tracking-wider uppercase py-1.5 px-2 bg-stone-100 dark:bg-[#202020] hover:bg-stone-200 dark:hover:bg-[#2a2a2a] transition flex items-center justify-between rounded-sm">
+              <span class="inline-flex items-center truncate">${SVG_ICONS.calendar}${y.year}</span>
+              <span class="text-[10px] opacity-50 font-normal">${y.albums.length}</span>
+            </button>
+            <div class="pl-2 space-y-1 mt-1 border-l border-stone-200 dark:border-stone-800 ml-1.5">
+              ${y.albums.map(a => {
+                const isActive = a.path === activePath;
+                const activeClass = isActive
+                  ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium'
+                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#222]';
+                return `
+                  <button onclick="openAlbum('${encodeURIComponent(a.path)}'); if(window.innerWidth < 768) toggleMobileSidebar();" class="w-full text-left px-2.5 py-1.5 transition truncate flex items-center justify-between rounded-sm ${activeClass}">
+                    <span class="truncate inline-flex items-center">${SVG_ICONS.folder}${a.path}</span>
+                    <span class="opacity-50 text-[10px] ml-1 shrink-0">(${a.count})</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+      treeEl.innerHTML = html;
+    }
+
+    function renderYears(selectedYear) {
+      const container = document.getElementById('years-container');
+      const filtered = selectedYear === 'ALL' ? allYears : allYears.filter(y => y.year === selectedYear);
+      if (!filtered.length) {
+        container.innerHTML = `<p class="text-center text-stone-400 tracking-widest uppercase text-sm py-20">${t('no_albums')}</p>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(yearObj => `
+        <div id="${safeYearId(yearObj.year)}" class="scroll-mt-6">
+          <div class="flex items-baseline justify-between border-b border-stone-200 dark:border-stone-800 pb-4 mb-8">
+            <h2 class="serif-title text-3xl md:text-4xl tracking-widest">${yearObj.year}</h2>
+            <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${yearObj.albums.length} ${t('folders_count')}</span>
+          </div>
+          <div class="photo-grid">
+            ${yearObj.albums.map(album => `
+              <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="group cursor-pointer">
+                <div class="aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
+                  <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                </div>
+                <h3 class="text-sm tracking-[0.15em] uppercase font-medium group-hover:text-stone-600 dark:group-hover:text-stone-300 transition truncate">${album.path}</h3>
+                <p class="text-xs tracking-[0.15em] text-stone-400 uppercase mt-0.5">${album.count} ${t('photos_count')}</p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function setHashSilently(newHash) {
+      suppressHashEvent = true;
+      window.location.hash = newHash;
+      setTimeout(() => { suppressHashEvent = false; }, 50);
+    }
+
+    async function handleHashNavigation() {
+      if (suppressHashEvent) return;
+      const hash = window.location.hash || '';
+      if (hash.startsWith('#album/')) {
+        const encPath = hash.slice('#album/'.length);
+        if (encPath) await openAlbum(encPath, false);
+      } else if (hash.startsWith('#year/')) {
+        const yearStr = decodeURIComponent(hash.slice('#year/'.length));
+        navigateToYear(yearStr);
+      } else {
+        showHomeView(true, false);
+      }
+    }
+
+    window.addEventListener('hashchange', handleHashNavigation);
+
+    async function openAlbum(rawPath, updateHash = true) {
+      const cleanPath = decodeURIComponent(rawPath).replace(/^\/+/, '');
+      currentAlbumPath = cleanPath;
+      currentAlbumPathEncoded = encodeURIComponent(cleanPath);
+
+      if (updateHash) {
+        setHashSilently(`#album/${currentAlbumPathEncoded}`);
+      }
+
+      const res = await fetch(`/api/album/${currentAlbumPathEncoded}`);
+      if (!res.ok) return;
+      const album = await res.json();
+      currentPhotos = album.photos || [];
+      showOnlyFavorites = false;
+      document.getElementById('album-hero-img').src = album.cover || '';
+      document.getElementById('album-year-label').textContent = album.year;
+      document.getElementById('album-title').textContent = album.path;
+      document.getElementById('album-count').textContent = `${album.count} ${t('photos_upper')}`;
+
+      const zipBtn = document.getElementById('album-zip-btn');
+      if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
+        zipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}`;
+        zipBtn.classList.remove('hidden');
+      } else {
+        zipBtn.classList.add('hidden');
+      }
+
+      renderSidebarTree(cleanPath);
+      renderAlbumPhotos();
+      showHomeView(false, false);
+    }
+
+    function showHomeView(isHome = true, clearHash = true) {
+      const homeView = document.getElementById('home-view');
+      const albumView = document.getElementById('album-view');
+      const mainContainer = document.getElementById('main-scroll-area');
+
+      if (isHome) {
+        currentAlbumPath = '';
+        homeView.classList.remove('hidden');
+        albumView.classList.add('hidden');
+        renderSidebarTree('');
+        if (clearHash) setHashSilently('');
+      } else {
+        homeView.classList.add('hidden');
+        albumView.classList.remove('hidden');
+      }
+      mainContainer.scrollTop = 0;
+    }
+
+    function showHome() {
+      showHomeView(true, true);
+      loadStructure();
+    }
+
+    function setFavoritesFilter(onlyFavs) {
+      showOnlyFavorites = onlyFavs;
+      renderAlbumPhotos();
+    }
+
+    function getSortedPhotos(list) {
+      const copy = [...list];
+      copy.sort((a, b) => {
+        if (currentSort === 'name_desc') {
+          return b.name.localeCompare(a.name, undefined, { numeric: true });
+        }
+        if (currentSort === 'date_asc') {
+          return (a.sort_date || '').localeCompare(b.sort_date || '') || a.name.localeCompare(b.name, undefined, { numeric: true });
+        }
+        if (currentSort === 'date_desc') {
+          return (b.sort_date || '').localeCompare(a.sort_date || '') || a.name.localeCompare(b.name, undefined, { numeric: true });
+        }
+        return a.name.localeCompare(b.name, undefined, { numeric: true });
+      });
+      return copy;
+    }
+
+    function renderAlbumPhotos() {
+      const favPhotos = currentPhotos.filter(p => p.is_favorite);
+      document.getElementById('fav-counter-badge').textContent = favPhotos.length;
+      const tabAll = document.getElementById('tab-all-photos');
+      const tabFav = document.getElementById('tab-fav-photos');
+      const favActionsBar = document.getElementById('fav-actions-bar');
+      const favZipBtn = document.getElementById('album-fav-zip-btn');
+
+      const baseList = showOnlyFavorites ? favPhotos : currentPhotos;
+      displayedPhotos = getSortedPhotos(baseList);
+
+      if (showOnlyFavorites) {
+        tabAll.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 transition';
+        tabFav.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5';
+      } else {
+        tabAll.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition';
+        tabFav.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition inline-flex items-center gap-1.5';
+      }
+
+      if (favPhotos.length > 0) {
+        favActionsBar.classList.remove('hidden');
+        if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
+          favZipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}?favorites_only=true`;
+          favZipBtn.classList.remove('hidden');
+        } else {
+          favZipBtn.classList.add('hidden');
+        }
+      } else {
+        favActionsBar.classList.add('hidden');
+      }
+
+      const grid = document.getElementById('photos-grid');
+      if (!displayedPhotos.length) {
+        grid.className = '';
+        grid.innerHTML = `<p class="col-span-full text-center text-stone-400 tracking-widest uppercase text-xs py-16">${t('no_photos')}</p>`;
+        return;
+      }
+
+      const isCrop = currentRatio === 'crop';
+      grid.className = isCrop ? 'photo-grid' : 'justified-grid';
+
+      grid.innerHTML = displayedPhotos.map((p, idx) => `
+        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
+          <img src="${p.thumb}" loading="lazy" alt="${p.name}" 
+               onload="if(!${isCrop}) { this.parentElement.style.flexGrow = this.naturalWidth / this.naturalHeight; this.parentElement.style.flexBasis = (this.naturalWidth / this.naturalHeight * this.parentElement.clientHeight) + 'px'; }"
+               onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:opacity-95 transition duration-300" />
+          <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
+            ${p.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline}
+          </button>
+        </div>
+      `).join('');
+    }
+
+    async function toggleFavoriteByPath(event, encodedPhotoPath) {
+      if (event) event.stopPropagation();
+      const decodedPath = decodeURIComponent(encodedPhotoPath);
+      const res = await fetch('/api/favorites/toggle', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photo_path: decodedPath })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const target = currentPhotos.find(p => p.path === decodedPath);
+      if (target) target.is_favorite = data.is_favorite;
+      renderAlbumPhotos();
+      const lb = document.getElementById('lightbox');
+      if (!lb.classList.contains('hidden') && displayedPhotos[currentIndex]) {
+        updateLightbox(false);
+      }
+    }
+
+    async function toggleFavoriteCurrentLightbox() {
+      const item = displayedPhotos[currentIndex];
+      if (!item) return;
+      await toggleFavoriteByPath(null, encodeURIComponent(item.path));
+    }
+
+    function copyFavoriteFilenames() {
+      const names = currentPhotos.filter(p => p.is_favorite).map(p => p.name);
+      if (!names.length) return;
+      navigator.clipboard.writeText(names.join(', '));
+      alert(`${t('copied_files')} (${names.length}):\n${names.join(', ')}`);
+    }
+
+    function applyZoomTransform() {
+      const img = document.getElementById('lb-image');
+      if (!isZoomed) {
+        img.style.transform = 'translate3d(0px, 0px, 0) scale(1)';
+        img.style.cursor = 'zoom-in';
+      } else {
+        img.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${zoomScale})`;
+        img.style.cursor = isDragging ? 'grabbing' : 'grab';
+      }
+    }
+
+    function resetZoomState() {
+      isZoomed = false;
+      zoomScale = 1;
+      panX = 0;
+      panY = 0;
+      isDragging = false;
+      const img = document.getElementById('lb-image');
+      img.classList.remove('dragging');
+      document.getElementById('zoom-label').textContent = t('zoom_in');
+      document.getElementById('lb-res-badge').textContent = t('badge_preview');
+      applyZoomTransform();
+    }
+
+    function openLightbox(index) {
+      currentIndex = index;
+      resetZoomState();
+      updateLightbox(true);
+      document.getElementById('lightbox').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox').classList.add('hidden');
+      document.body.style.overflow = '';
+      resetZoomState();
+    }
+
+    function toggleZoom() {
+      const item = displayedPhotos[currentIndex];
+      if (!item) return;
+      const img = document.getElementById('lb-image');
+      const label = document.getElementById('zoom-label');
+      const badge = document.getElementById('lb-res-badge');
+
+      if (!isZoomed) {
+        isZoomed = true;
+        zoomScale = 2.2;
+        panX = 0;
+        panY = 0;
+        label.textContent = t('zoom_reset');
+        badge.textContent = t('badge_loading_orig');
+        img.onload = () => {
+          if (isZoomed) badge.textContent = t('badge_orig');
+        };
+        img.src = item.original;
+        applyZoomTransform();
+      } else {
+        resetZoomState();
+        img.onload = null;
+        img.src = item.preview;
+      }
+    }
+
+    function preloadNeighbors(idx) {
+      if (displayedPhotos.length <= 1) return;
+      const nextIdx = (idx + 1) % displayedPhotos.length;
+      const prevIdx = (idx - 1 + displayedPhotos.length) % displayedPhotos.length;
+      const imgNext = new Image();
+      imgNext.src = displayedPhotos[nextIdx].preview;
+      const imgPrev = new Image();
+      imgPrev.src = displayedPhotos[prevIdx].preview;
+    }
+
+    function stepPhoto(dir) {
+      if (!displayedPhotos.length) return;
+      currentIndex = (currentIndex + dir + displayedPhotos.length) % displayedPhotos.length;
+      resetZoomState();
+      updateLightbox(true);
+    }
+
+    function updateLightbox(reloadImage = true) {
+      const item = displayedPhotos[currentIndex];
+      if (!item) {
+        closeLightbox();
+        return;
+      }
+      const img = document.getElementById('lb-image');
+      if (reloadImage) {
+        img.onload = null;
+        img.src = isZoomed ? item.original : item.preview;
+        preloadNeighbors(currentIndex);
+      }
+
+      document.getElementById('lb-download').href = `${item.original}?download=true`;
+      document.getElementById('lb-counter').textContent = `${currentIndex + 1} / ${displayedPhotos.length}`;
+      document.getElementById('lb-filename').textContent = item.name;
+
+      const favIcon = document.getElementById('lb-fav-icon');
+      const favLabel = document.getElementById('lb-fav-label');
+      if (item.is_favorite) {
+        favIcon.innerHTML = SVG_ICONS.heartActive;
+        favLabel.textContent = t('fav_in');
+      } else {
+        favIcon.innerHTML = SVG_ICONS.heartOutline;
+        favLabel.textContent = t('fav_add');
+      }
+
+      const exifEl = document.getElementById('lb-exif');
+      if (appSettings.show_exif && item.exif && Object.keys(item.exif).length > 0) {
+        const parts = [];
+        if (item.exif.camera) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.camera}${item.exif.camera}</span>`);
+        if (item.exif.lens) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.lens}${item.exif.lens}</span>`);
+        if (item.exif.focal) parts.push(`<span>${item.exif.focal}</span>`);
+        if (item.exif.aperture) parts.push(`<span>${item.exif.aperture}</span>`);
+        if (item.exif.shutter) parts.push(`<span>${item.exif.shutter}</span>`);
+        if (item.exif.iso) parts.push(`<span>${item.exif.iso}</span>`);
+        if (item.exif.dimensions) parts.push(`<span>${item.exif.dimensions}</span>`);
+        if (item.exif.date) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.calendar}${item.exif.date}</span>`);
+        exifEl.innerHTML = parts.join('<span class="text-stone-400">•</span>');
+      } else {
+        exifEl.innerHTML = '';
+      }
+    }
+
+    (function setupLightboxInteractions() {
+      const container = document.getElementById('lb-image-container');
+      const img = document.getElementById('lb-image');
+
+      img.addEventListener('mousedown', (e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        didDragMove = false;
+        if (!isZoomed) return;
+        isDragging = true;
+        dragStartX = e.clientX - panX;
+        dragStartY = e.clientY - panY;
+        img.classList.add('dragging');
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging || !isZoomed) return;
+        const dx = e.clientX - dragStartX;
+        const dy = e.clientY - dragStartY;
+        if (Math.abs(dx - panX) > 4 || Math.abs(dy - panY) > 4) {
+          didDragMove = true;
+        }
+        panX = dx;
+        panY = dy;
+        applyZoomTransform();
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (isDragging) {
+          isDragging = false;
+          img.classList.remove('dragging');
+          applyZoomTransform();
+        }
+      });
+
+      img.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        toggleZoom();
+      });
+
+      container.addEventListener('wheel', (e) => {
+        const lb = document.getElementById('lightbox');
+        if (lb.classList.contains('hidden')) return;
+        e.preventDefault();
+        if (!isZoomed) {
+          if (e.deltaY < 0) toggleZoom();
+          return;
+        }
+        const delta = e.deltaY < 0 ? 0.25 : -0.25;
+        zoomScale = Math.min(5, Math.max(1.2, zoomScale + delta));
+        applyZoomTransform();
+      }, { passive: false });
+
+      let touchStartX = 0;
+      let touchStartY = 0;
+      container.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+        if (isZoomed) {
+          isDragging = true;
+          dragStartX = touchStartX - panX;
+          dragStartY = touchStartY - panY;
+          img.classList.add('dragging');
+        }
+      }, { passive: true });
+
+      container.addEventListener('touchmove', (e) => {
+        if (!isZoomed || !isDragging || e.touches.length !== 1) return;
+        panX = e.touches[0].clientX - dragStartX;
+        panY = e.touches[0].clientY - dragStartY;
+        applyZoomTransform();
+      }, { passive: true });
+
+      container.addEventListener('touchend', (e) => {
+        if (isZoomed) {
+          isDragging = false;
+          img.classList.remove('dragging');
+          return;
+        }
+        if (!e.changedTouches.length) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+          stepPhoto(dx < 0 ? 1 : -1);
+        }
+      });
+    })();
+
+    async function openSettingsModal() {
+      document.getElementById('pref-gallery-title').value = appSettings.gallery_title || 'PHOTO ARCHIVE';
+      document.getElementById('opt-show-exif').checked = !!appSettings.show_exif;
+      document.getElementById('opt-allow-zip').checked = !!appSettings.allow_zip_download;
+      document.getElementById('opt-exclude-exts').value = appSettings.exclude_extensions || '';
+      document.getElementById('opt-exclude-masks').value = appSettings.exclude_masks || '';
+      document.getElementById('opt-hidden-folders').value = appSettings.hidden_folders || '';
+      document.getElementById('filter-saved-msg').classList.add('hidden');
+      document.getElementById('title-saved-msg').classList.add('hidden');
+      renderAlbumCheckboxes();
+      await loadUsersList();
+      await pollPregenStatus();
+      document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    function closeSettingsModal() {
+      document.getElementById('settings-modal').classList.add('hidden');
+      if (pregenPollTimer) clearInterval(pregenPollTimer);
+    }
+
+    async function saveGalleryTitleOnly() {
+      appSettings.gallery_title = document.getElementById('pref-gallery-title').value;
+      appSettings.show_exif = document.getElementById('opt-show-exif').checked;
+      appSettings.allow_zip_download = document.getElementById('opt-allow-zip').checked;
+      appSettings.exclude_extensions = document.getElementById('opt-exclude-exts').value;
+      appSettings.exclude_masks = document.getElementById('opt-exclude-masks').value;
+      appSettings.hidden_folders = document.getElementById('opt-hidden-folders').value;
+
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appSettings)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        appSettings = data.settings;
+        if (appSettings.gallery_title) {
+          document.title = appSettings.gallery_title;
+          document.getElementById('header-brand-title').textContent = appSettings.gallery_title;
+          document.getElementById('login-modal-title').textContent = appSettings.gallery_title;
+        }
+        const msg = document.getElementById('title-saved-msg');
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+    }
+
+    async function saveGlobalSettings(refreshGallery = false) {
+      await saveGalleryTitleOnly();
+      if (refreshGallery) {
+        const msg = document.getElementById('filter-saved-msg');
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+        await loadStructure();
+      }
+    }
+
+    async function clearCacheFiles() {
+      if (!confirm(t('confirm_clear_cache'))) return;
+      const res = await fetch('/api/cache/clear', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        alert(`${t('alert_cache_cleared')} ${data.deleted_files}`);
+        await pollPregenStatus();
+      }
+    }
+
+    async function triggerPregenerate() {
+      document.getElementById('pregen-action-btn').classList.add('hidden');
+      document.getElementById('pregen-cancel-btn').classList.remove('hidden');
+      await fetch('/api/pregenerate', { method: 'POST' });
+      pollPregenStatus();
+      if (pregenPollTimer) clearInterval(pregenPollTimer);
+      pregenPollTimer = setInterval(pollPregenStatus, 1500);
+    }
+
+    async function cancelPregenerate() {
+      await fetch('/api/pregenerate/cancel', { method: 'POST' });
+      document.getElementById('pregen-status-text').textContent = t('status_stopping');
+    }
+
+    function formatBytes(bytes, decimals = 2) {
+      if (bytes === 0) return '0 B';
+      const k = 1024;
+      const dm = decimals < 0 ? 0 : decimals;
+      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+    }
+
+    async function pollPregenStatus() {
+      const res = await fetch('/api/pregenerate/status');
+      if (!res.ok) return;
+      const st = await res.json();
+      const textEl = document.getElementById('pregen-status-text');
+      const wrapEl = document.getElementById('pregen-bar-wrap');
+      const barEl = document.getElementById('pregen-bar');
+      const actionBtn = document.getElementById('pregen-action-btn');
+      const cancelBtn = document.getElementById('pregen-cancel-btn');
+      const badgeEl = document.getElementById('cache-size-badge');
+
+      if (badgeEl && st.cache_size_bytes !== undefined) {
+        badgeEl.textContent = `${t('cache_size')} ${formatBytes(st.cache_size_bytes)}`;
+      }
+
+      if (st.running) {
+        wrapEl.classList.remove('hidden');
+        actionBtn.classList.add('hidden');
+        cancelBtn.classList.remove('hidden');
+        const pct = st.total > 0 ? Math.round((st.processed / st.total) * 100) : 0;
+        barEl.style.width = `${pct}%`;
+        const fileLabel = st.current_file === 'SCANNING' ? t('status_scanning') : st.current_file;
+        textEl.textContent = `${st.processed} / ${st.total} (${pct}%) — ${fileLabel}`;
+      } else {
+        wrapEl.classList.add('hidden');
+        actionBtn.classList.remove('hidden');
+        cancelBtn.classList.add('hidden');
+        if (textEl.textContent !== t('status_stopping')) {
+          textEl.textContent = t('status_ready');
+        }
+        if (pregenPollTimer) clearInterval(pregenPollTimer);
+      }
+    }
+
+    function renderAlbumCheckboxes(selectedAlbums = [], mode = 'allow') {
+      const box = document.getElementById('albums-checkbox-list');
+      document.querySelector(`input[name="access-mode"][value="${mode}"]`).checked = true;
+      currentUserEditMode = mode;
+
+      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
+      for (const a of allAlbumsCatalog) {
+        const isChecked = selectedAlbums.includes('*') || selectedAlbums.includes(a.path);
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${a.label}</span></label>`;
+      }
+      box.innerHTML = html;
+    }
+
+    async function loadUsersList() {
+      const res = await fetch('/api/users');
+      if (!res.ok) return;
+      const data = await res.json();
+      const listEl = document.getElementById('users-list');
+      listEl.innerHTML = data.users.map(u => `
+        <div class="flex items-center justify-between bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 px-3 py-2">
+          <div class="flex items-center flex-wrap gap-1.5">
+            <span class="font-semibold">${u.username}</span>
+            <span class="text-[10px] uppercase bg-stone-200 dark:bg-stone-700 px-1.5 py-0.5">${u.role}</span>
+            <span class="text-[10px] uppercase bg-stone-300 dark:bg-stone-600 px-1.5 py-0.5">${u.mode === 'deny' ? t('mode_badge_deny') : t('mode_badge_allow')}</span>
+            <span class="text-[11px] text-red-600 inline-flex items-center gap-0.5 ml-1">${SVG_ICONS.heartActive} ${u.favorites_count || 0}</span>
+          </div>
+          <div class="flex items-center space-x-3">
+            <button onclick="editUserPrompt('${u.username}', '${u.role}', '${u.mode || 'allow'}', '${encodeURIComponent(JSON.stringify(u.allowed_albums))}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
+            ${u.username !== currentUser.username ? `<button onclick="deleteUser('${u.username}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function editUserPrompt(username, role, mode, encAlbums) {
+      document.getElementById('new-u-name').value = username;
+      document.getElementById('new-u-pass').value = '';
+      document.getElementById('new-u-role').value = role;
+      const albums = JSON.parse(decodeURIComponent(encAlbums));
+      renderAlbumCheckboxes(albums, mode);
+    }
+
+    async function handleSaveUser(e) {
+      e.preventDefault();
+      const username = document.getElementById('new-u-name').value.trim();
+      const password = document.getElementById('new-u-pass').value;
+      const role = document.getElementById('new-u-role').value;
+      const mode = currentUserEditMode;
+      const checked = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
+
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password: password || null, role, mode, allowed_albums: role === 'admin' ? ['*'] : checked })
+      });
+      if (res.ok) {
+        document.getElementById('new-u-name').value = '';
+        document.getElementById('new-u-pass').value = '';
+        renderAlbumCheckboxes([], 'allow');
+        await loadUsersList();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error');
+      }
+    }
+
+    async function deleteUser(uname) {
+      if (!confirm(`${t('confirm_del_user')} ${uname}?`)) return;
+      await fetch(`/api/users/${encodeURIComponent(uname)}`, { method: 'DELETE' });
+      await loadUsersList();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const lb = document.getElementById('lightbox');
+      if (lb.classList.contains('hidden')) return;
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowRight') stepPhoto(1);
+      if (e.key === 'ArrowLeft') stepPhoto(-1);
+    });
+
+    initApp();
+  </script>
+</body>
+</html>
