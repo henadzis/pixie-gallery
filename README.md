@@ -21,6 +21,7 @@ services:
     ports:
       - "8085:8000"
     volumes:
+      # Замените левую часть на фактический путь к вашей папке с фотографиями:
       - /DATA/Media/Photos:/photos:ro
       - /DATA/AppData/pixie-gallery/cache:/cache
     environment:
