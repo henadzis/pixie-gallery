@@ -12,16 +12,34 @@
 
 ## Быстрый старт (Docker Compose)
 ```yaml
+name: pixie-gallery
 services:
   pixie-gallery:
-    image: python:3.12-slim
+    image: ghcr.io/henadzis/pixie-gallery:latest
     container_name: pixie-gallery
     restart: unless-stopped
-    working_dir: /code
-    command: ["sh", "/code/app/start.sh"]
     ports:
       - "8085:8000"
     volumes:
-      - ./app:/code/app
-      - /path/to/photos:/photos:ro
-      - ./cache:/cache
+      - /DATA/Media/Photos:/photos:ro
+      - /DATA/AppData/pixie-gallery/cache:/cache
+    environment:
+      - PHOTOS_DIR=/photos
+      - CACHE_DIR=/cache
+      - GALLERY_TITLE=PORTFOLIO & ARCHIVE
+      - ADMIN_USER=admin
+      - ADMIN_PASS=admin123
+      - SECRET_KEY=my-local-nas-secret-key-2026
+      - DEFAULT_EXCLUDE_EXTS=.cr2,.cr3,.nef,.arw,.dng,.orf,.rw2,.pef,.raf,.tif,.tiff,.psd,.xmp
+      - DEFAULT_EXCLUDE_MASKS=*_small.*, *_smal.*, *_thumb.*, ._*
+    x-casaos:
+      author: henadzis
+      category: Gallery
+      hostname: ""
+      icon: https://cdn-icons-png.flaticon.com/512/3342/3342137.png
+      index: /
+      port_map: "8085"
+      scheme: http
+      title:
+        en_us: Pixie Gallery
+        ru_ru: Pixie Галерея
