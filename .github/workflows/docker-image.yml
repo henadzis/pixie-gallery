@@ -11,6 +11,8 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    
+    # ВНИМАНИЕ: Вот этот блок дает токену права на запись пакетов
     permissions:
       contents: read
       packages: write
@@ -39,5 +41,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.steps.meta.outputs.tags || format('{0}/{1}:latest', env.REGISTRY, env.IMAGE_NAME) }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
