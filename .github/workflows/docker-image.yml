@@ -1,8 +1,7 @@
 name: Build and Push Docker Image
 
 on:
-  push:
-    branches: [ "main" ]
+  workflow_dispatch: # <-- Эта команда включает ручной запуск по кнопке
 
 env:
   REGISTRY: ghcr.io
@@ -12,7 +11,6 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     
-    # ВНИМАНИЕ: Вот этот блок дает токену права на запись пакетов
     permissions:
       contents: read
       packages: write
@@ -34,7 +32,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+            type=raw,value=latest,enable=true
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
