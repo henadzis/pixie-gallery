@@ -29,7 +29,7 @@
       .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
     }
 
-/* Умная строчная сетка без обрезки */
+    /* Умная строчная сетка без обрезки */
     .justified-grid {
       display: flex;
       flex-wrap: wrap;
@@ -42,7 +42,6 @@
       height: 0;
     }
     .justified-item {
-      /* Высота строки теперь зависит от выбранных колонок! 3=400px, 4=300px, 5=240px, 6=180px */
       height: calc(1200px / var(--user-cols, 4)); 
       flex-grow: 1;
       position: relative;
@@ -53,7 +52,6 @@
       left: 0;
       width: 100%;
       height: 100%;
-      /* contain гарантирует, что фото влезет целиком без обрезки */
       object-fit: contain; 
     }
     @media (max-width: 768px) {
@@ -176,6 +174,9 @@
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
+      <div class="px-4 py-2 border-b border-stone-200 dark:border-stone-800">
+        <input type="text" id="sidebar-search" oninput="handleSearch(this.value)" placeholder="Поиск альбома..." data-i18n-placeholder="search_placeholder" class="w-full bg-stone-50 dark:bg-[#202020] border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs rounded-sm focus:outline-none focus:border-stone-500 dark:focus:border-stone-400 transition" />
+      </div>
       <div id="sidebar-tree" class="sidebar-scroll flex-grow overflow-y-auto p-4 space-y-4 text-xs"></div>
     </aside>
 
@@ -194,7 +195,7 @@
       </div>
 
       <!-- ЭКРАН ОТКРЫТОГО АЛЬБОМА -->
-      <section id="album-view" class="hidden pb-20">
+      <section id="album-view" class="hidden pb-12">
         <div class="relative h-[42vh] min-h-[300px] w-full bg-stone-900 overflow-hidden">
           <img id="album-hero-img" src="" alt="" class="w-full h-full object-cover opacity-75 scale-105 transition-transform duration-1000" />
           <div class="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white px-4 text-center">
@@ -206,8 +207,12 @@
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                 </svg>
-                <span data-i18n="download_album_zip">Скачать весь альбом (ZIP)</span>
+                <span data-i18n="download_album_zip">Скачать (ZIP)</span>
               </a>
+              <button id="album-hide-btn" onclick="hideCurrentAlbum()" class="bg-black/50 hover:bg-black/80 border border-white/30 text-white px-4 py-3 text-xs tracking-[0.2em] uppercase transition shadow-md inline-flex items-center gap-2 hidden">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                <span data-i18n="hide_album">Скрыть</span>
+              </button>
             </div>
           </div>
         </div>
@@ -249,6 +254,18 @@
 
         <div class="max-w-[1600px] mx-auto px-4 md:px-10 py-8">
           <div id="photos-grid" class="photo-grid"></div>
+        </div>
+        
+        <!-- НАВИГАЦИЯ ПО АЛЬБОМАМ -->
+        <div id="album-nav-footer" class="max-w-[1600px] mx-auto px-4 md:px-10 pb-8 flex flex-wrap justify-between items-center text-xs tracking-[0.15em] uppercase font-semibold gap-4">
+            <button id="nav-prev-btn" class="hover:text-stone-500 transition hidden inline-flex items-center gap-2 truncate max-w-[45%] text-left" onclick="navigateToSibling(-1)">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="15 18 9 12 15 6"/></svg>
+              <span id="nav-prev-name" class="truncate"></span>
+            </button>
+            <button id="nav-next-btn" class="hover:text-stone-500 transition hidden ml-auto inline-flex items-center gap-2 truncate max-w-[45%] text-right justify-end" onclick="navigateToSibling(1)">
+              <span id="nav-next-name" class="truncate"></span>
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
         </div>
       </section>
 
@@ -383,15 +400,26 @@
           </div>
           <input id="opt-allow-zip" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100" />
         </label>
+        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+          <div>
+            <div class="text-sm font-medium text-red-600 dark:text-red-400" data-i18n="opt_show_hidden_title">Показывать скрытые альбомы</div>
+            <div class="text-xs text-stone-500" data-i18n="opt_show_hidden_desc">Отображать скрытые альбомы в галерее (выделяются цветом)</div>
+          </div>
+          <input id="opt-show-hidden" type="checkbox" onchange="saveGlobalSettings(true)" class="w-5 h-5 accent-red-600 dark:accent-red-500" />
+        </label>
       </div>
 
       <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_filters">Фильтрация папок и файлов</h3>
         <div class="space-y-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+          
           <div>
-            <label class="block text-xs font-medium mb-1" data-i18n="filter_hidden">Скрыть папки (через запятую):</label>
-            <input id="opt-hidden-folders" type="text" placeholder="Private, Temp" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <label class="block text-xs font-medium mb-1" data-i18n="filter_hidden">Скрытые альбомы (снимите галочку, чтобы вернуть):</label>
+            <div id="hidden-albums-list" class="max-h-40 overflow-y-auto border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] p-2 space-y-1">
+               <!-- Checkboxes render here -->
+            </div>
           </div>
+          
           <div>
             <label class="block text-xs font-medium mb-1" data-i18n="filter_exts">Исключить расширения файлов (через запятую):</label>
             <input id="opt-exclude-exts" type="text" placeholder=".cr2, .cr3, .dng, .tif" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
@@ -422,7 +450,7 @@
             <span data-i18n="btn_stop">Остановить</span>
           </button>
           <button onclick="clearCacheFiles()" class="inline-flex items-center gap-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs tracking-[0.18em] uppercase transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/></svg>
             <span data-i18n="btn_clear_cache">Очистить кэш</span>
           </button>
           <span id="pregen-status-text" class="text-xs text-stone-500"></span>
@@ -478,6 +506,7 @@
         nav_home: 'На главную',
         nav_settings: 'Настройки',
         nav_logout: 'Выйти',
+        search_placeholder: 'Поиск альбома...',
         cols_label: 'Столбцы:',
         cols_3: '3 в ряд',
         cols_4: '4 в ряд',
@@ -492,7 +521,8 @@
         folders_count: 'папок',
         photos_count: 'фото',
         photos_upper: 'ФОТОГРАФИЙ',
-        download_album_zip: 'Скачать весь альбом (ZIP)',
+        download_album_zip: 'Скачать (ZIP)',
+        hide_album: 'Скрыть',
         tab_all: 'Все кадры',
         tab_fav: 'Избранное',
         sort_label: 'Сортировка:',
@@ -503,6 +533,8 @@
         copy_fav_names: 'Скопировать имена',
         download_fav_zip: 'Скачать избранное (ZIP)',
         no_photos: 'Нет фотографий для отображения',
+        fav_empty_title: 'В избранном пока пусто',
+        fav_empty_desc: 'Нажимайте на иконку сердечка на фотографиях, чтобы собрать здесь лучшие кадры.',
         fav_add: 'В избранное',
         fav_in: 'В избранном',
         zoom_in: 'Оригинал / Зум',
@@ -532,8 +564,10 @@
         opt_exif_desc: 'Камера, объектив, диафрагма, выдержка, ISO',
         opt_zip_title: 'Разрешить скачивание альбомов ZIP',
         opt_zip_desc: 'Кнопки загрузки архивов для клиентов',
+        opt_show_hidden_title: 'Показывать скрытые альбомы',
+        opt_show_hidden_desc: 'Отображать скрытые альбомы в галерее (выделяются цветом)',
         settings_filters: 'Фильтрация папок и файлов',
-        filter_hidden: 'Скрыть папки (через запятую):',
+        filter_hidden: 'Скрытые альбомы (снимите галочку, чтобы вернуть):',
         filter_exts: 'Исключить расширения файлов (через запятую):',
         filter_masks: 'Исключить маски имен файлов (через запятую):',
         btn_apply_filters: 'Применить фильтры',
@@ -562,7 +596,9 @@
         confirm_clear_cache: 'Вы уверены, что хотите очистить весь кэш миниатюр?',
         alert_cache_cleared: 'Кэш очищен! Удалено файлов:',
         confirm_del_user: 'Удалить пользователя',
-        copied_files: 'Скопировано имен файлов'
+        confirm_hide_album: 'Вы действительно хотите скрыть этот альбом?',
+        copied_files: 'Скопировано имен файлов',
+        no_hidden: 'Нет скрытых альбомов'
       },
       en: {
         login_subtitle: 'Client Gallery Login',
@@ -573,6 +609,7 @@
         nav_home: 'Home',
         nav_settings: 'Settings',
         nav_logout: 'Logout',
+        search_placeholder: 'Search album...',
         cols_label: 'Columns:',
         cols_3: '3 per row',
         cols_4: '4 per row',
@@ -587,7 +624,8 @@
         folders_count: 'folders',
         photos_count: 'photos',
         photos_upper: 'PHOTOS',
-        download_album_zip: 'Download Full Album (ZIP)',
+        download_album_zip: 'Download (ZIP)',
+        hide_album: 'Hide',
         tab_all: 'All Photos',
         tab_fav: 'Favorites',
         sort_label: 'Sort by:',
@@ -598,6 +636,8 @@
         copy_fav_names: 'Copy Filenames',
         download_fav_zip: 'Download Favorites (ZIP)',
         no_photos: 'No photos to display',
+        fav_empty_title: 'Favorites are empty',
+        fav_empty_desc: 'Click the heart icon on photos to collect your best shots here.',
         fav_add: 'Favorite',
         fav_in: 'Favorited',
         zoom_in: 'Original / Zoom',
@@ -627,8 +667,10 @@
         opt_exif_desc: 'Camera model, lens, aperture, shutter speed, ISO',
         opt_zip_title: 'Allow ZIP Album Downloads',
         opt_zip_desc: 'Enable archive download buttons for clients',
+        opt_show_hidden_title: 'Show hidden albums',
+        opt_show_hidden_desc: 'Display hidden albums in gallery (highlighted)',
         settings_filters: 'Folder & File Filtering',
-        filter_hidden: 'Hide folders (comma-separated):',
+        filter_hidden: 'Hidden albums (uncheck to restore):',
         filter_exts: 'Exclude file extensions (comma-separated):',
         filter_masks: 'Exclude filename masks (comma-separated):',
         btn_apply_filters: 'Apply Filters',
@@ -657,7 +699,9 @@
         confirm_clear_cache: 'Are you sure you want to clear all cached thumbnails?',
         alert_cache_cleared: 'Cache cleared! Files removed:',
         confirm_del_user: 'Delete user',
-        copied_files: 'Copied filenames'
+        confirm_hide_album: 'Are you sure you want to hide this album?',
+        copied_files: 'Copied filenames',
+        no_hidden: 'No hidden albums'
       }
     };
 
@@ -672,11 +716,12 @@
 
     let currentLang = localStorage.getItem('pixie_lang') || 'ru';
     let currentUser = null;
-    let appSettings = { gallery_title: 'PHOTO ARCHIVE', show_exif: true, allow_zip_download: true, exclude_extensions: '', exclude_masks: '', hidden_folders: '' };
+    let appSettings = { gallery_title: 'PHOTO ARCHIVE', show_exif: true, allow_zip_download: true, exclude_extensions: '', exclude_masks: '', hidden_folders: '', show_hidden_albums: false };
     let allYears = [];
     let allAlbumsCatalog = [];
     let currentAlbumPath = '';
     let currentAlbumPathEncoded = '';
+    let currentAlbumYear = '';
     let currentPhotos = [];
     let displayedPhotos = [];
     let showOnlyFavorites = false;
@@ -804,12 +849,6 @@
       changeGridRatio(currentRatio === 'original' ? 'crop' : 'original', true);
     }
 
-    function changeAlbumSort(sortMode) {
-      currentSort = sortMode;
-      localStorage.setItem('pixie_sort', sortMode);
-      renderAlbumPhotos();
-    }
-
     function toggleSidebarCollapse() {
       const sidebar = document.getElementById('sidebar');
       const icon = document.getElementById('collapse-icon');
@@ -897,25 +936,64 @@
       allAlbumsCatalog = data.all_albums_catalog || [];
       renderSidebarTree(currentAlbumPath);
       renderYears('ALL');
+      // Re-apply search if it was active
+      const searchInput = document.getElementById('sidebar-search');
+      if (searchInput && searchInput.value) {
+          handleSearch(searchInput.value);
+      }
     }
 
     function safeYearId(yearStr) {
       return 'year-sec-' + encodeURIComponent(yearStr).replace(/[^a-zA-Z0-9_-]/g, '_');
     }
 
+    function scrollSidebarTo(elementId) {
+      const el = document.getElementById(elementId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
     function navigateToYear(yearStr) {
+      currentAlbumYear = yearStr;
       showHomeView(true);
       setHashSilently(`#year/${encodeURIComponent(yearStr)}`);
       if (window.innerWidth < 768) {
         const sidebar = document.getElementById('sidebar');
         if (!sidebar.classList.contains('-translate-x-full')) toggleMobileSidebar();
       }
-      setTimeout(() => {
-        const targetEl = document.getElementById(safeYearId(yearStr));
-        if (targetEl) {
-          targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function handleSearch(query) {
+      const q = query.toLowerCase();
+
+      // Фильтр сайдбара
+      document.querySelectorAll('.sidebar-album-btn').forEach(btn => {
+        const searchStr = (btn.getAttribute('data-search') || '').toLowerCase();
+        if (searchStr.includes(q)) {
+          btn.style.display = 'flex';
+        } else {
+          btn.style.display = 'none';
         }
-      }, 60);
+      });
+      document.querySelectorAll('.sidebar-year-group').forEach(group => {
+        const visible = group.querySelectorAll('.sidebar-album-btn:not([style*="display: none"])');
+        group.style.display = visible.length > 0 ? 'block' : 'none';
+      });
+
+      // Фильтр главной сетки
+      document.querySelectorAll('.home-album-card').forEach(card => {
+        const searchStr = (card.getAttribute('data-search') || '').toLowerCase();
+        if (searchStr.includes(q)) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+      document.querySelectorAll('.home-year-group').forEach(group => {
+        const visible = group.querySelectorAll('.home-album-card:not([style*="display: none"])');
+        group.style.display = visible.length > 0 ? 'block' : 'none';
+      });
     }
 
     function renderSidebarTree(activePath = '') {
@@ -929,20 +1007,21 @@
       for (const y of allYears) {
         const escapedYear = y.year.replace(/'/g, "\\'");
         html += `
-          <div class="space-y-1">
-            <button onclick="navigateToYear('${escapedYear}')" class="w-full text-left font-semibold text-stone-800 dark:text-stone-200 tracking-wider uppercase py-1.5 px-2 bg-stone-100 dark:bg-[#202020] hover:bg-stone-200 dark:hover:bg-[#2a2a2a] transition flex items-center justify-between rounded-sm">
+          <div class="space-y-1 sidebar-year-group">
+            <button id="sidebar-${safeYearId(y.year)}" onclick="navigateToYear('${escapedYear}')" class="w-full text-left font-semibold text-stone-800 dark:text-stone-200 tracking-wider uppercase py-1.5 px-2 bg-stone-100 dark:bg-[#202020] hover:bg-stone-200 dark:hover:bg-[#2a2a2a] transition flex items-center justify-between rounded-sm">
               <span class="inline-flex items-center truncate">${SVG_ICONS.calendar}${y.year}</span>
               <span class="text-[10px] opacity-50 font-normal">${y.albums.length}</span>
             </button>
             <div class="pl-2 space-y-1 mt-1 border-l border-stone-200 dark:border-stone-800 ml-1.5">
               ${y.albums.map(a => {
                 const isActive = a.path === activePath;
-                const activeClass = isActive
-                  ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium'
-                  : 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#222]';
+                let textClasses = 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#222]';
+                if (isActive) textClasses = 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium';
+                if (a.is_hidden && !isActive) textClasses = 'text-red-600 dark:text-red-400 hover:bg-stone-100 dark:hover:bg-[#222]';
+                
                 return `
-                  <button onclick="openAlbum('${encodeURIComponent(a.path)}'); if(window.innerWidth < 768) toggleMobileSidebar();" class="w-full text-left px-2.5 py-1.5 transition truncate flex items-center justify-between rounded-sm ${activeClass}">
-                    <span class="truncate inline-flex items-center">${SVG_ICONS.folder}${a.path}</span>
+                  <button id="sidebar-album-${encodeURIComponent(a.path)}" data-search="${a.path}" title="${a.path}" onclick="openAlbum('${encodeURIComponent(a.path)}'); if(window.innerWidth < 768) toggleMobileSidebar();" class="sidebar-album-btn w-full text-left px-2.5 py-1.5 transition truncate flex items-center justify-between rounded-sm ${textClasses}">
+                    <span class="truncate inline-flex items-center">${SVG_ICONS.folder}${a.name}</span>
                     <span class="opacity-50 text-[10px] ml-1 shrink-0">(${a.count})</span>
                   </button>
                 `;
@@ -963,18 +1042,18 @@
       }
 
       container.innerHTML = filtered.map(yearObj => `
-        <div id="${safeYearId(yearObj.year)}" class="scroll-mt-6">
+        <div id="${safeYearId(yearObj.year)}" class="home-year-group scroll-mt-24">
           <div class="flex items-baseline justify-between border-b border-stone-200 dark:border-stone-800 pb-4 mb-8">
             <h2 class="serif-title text-3xl md:text-4xl tracking-widest">${yearObj.year}</h2>
             <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${yearObj.albums.length} ${t('folders_count')}</span>
           </div>
           <div class="photo-grid">
             ${yearObj.albums.map(album => `
-              <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="group cursor-pointer">
+              <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="home-album-card group cursor-pointer" data-search="${album.path}" title="${album.path}">
                 <div class="aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
                   <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                 </div>
-                <h3 class="text-sm tracking-[0.15em] uppercase font-medium group-hover:text-stone-600 dark:group-hover:text-stone-300 transition truncate">${album.path}</h3>
+                <h3 class="text-sm tracking-[0.15em] uppercase font-medium transition truncate ${album.is_hidden ? 'text-red-600 dark:text-red-400' : 'group-hover:text-stone-600 dark:group-hover:text-stone-300'}">${album.name}</h3>
                 <p class="text-xs tracking-[0.15em] text-stone-400 uppercase mt-0.5">${album.count} ${t('photos_count')}</p>
               </div>
             `).join('')}
@@ -1005,6 +1084,51 @@
 
     window.addEventListener('hashchange', handleHashNavigation);
 
+    async function hideCurrentAlbum() {
+      if (!confirm(t('confirm_hide_album'))) return;
+      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      if (!hiddenList.includes(currentAlbumPath)) {
+        hiddenList.push(currentAlbumPath);
+        appSettings.hidden_folders = hiddenList.join(',');
+        
+        await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appSettings)
+        });
+      }
+      await loadStructure();
+      showHome();
+    }
+
+    function renderSiblingNav() {
+      const prevBtn = document.getElementById('nav-prev-btn');
+      const nextBtn = document.getElementById('nav-next-btn');
+      if (!allAlbumsCatalog || allAlbumsCatalog.length === 0) return;
+
+      const idx = allAlbumsCatalog.findIndex(a => a.path === currentAlbumPath);
+      
+      if (idx > 0) {
+        prevBtn.classList.remove('hidden');
+        document.getElementById('nav-prev-name').textContent = allAlbumsCatalog[idx-1].name || allAlbumsCatalog[idx-1].path.split('/').pop();
+        prevBtn.onclick = () => { openAlbum(encodeURIComponent(allAlbumsCatalog[idx-1].path)); };
+      } else {
+        prevBtn.classList.add('hidden');
+      }
+
+      if (idx !== -1 && idx < allAlbumsCatalog.length - 1) {
+        nextBtn.classList.remove('hidden');
+        document.getElementById('nav-next-name').textContent = allAlbumsCatalog[idx+1].name || allAlbumsCatalog[idx+1].path.split('/').pop();
+        nextBtn.onclick = () => { openAlbum(encodeURIComponent(allAlbumsCatalog[idx+1].path)); };
+      } else {
+        nextBtn.classList.add('hidden');
+      }
+    }
+
+    function navigateToSibling(dir) {
+      // Logic bounded to buttons directly now
+    }
+
     async function openAlbum(rawPath, updateHash = true) {
       const cleanPath = decodeURIComponent(rawPath).replace(/^\/+/, '');
       currentAlbumPath = cleanPath;
@@ -1018,10 +1142,11 @@
       if (!res.ok) return;
       const album = await res.json();
       currentPhotos = album.photos || [];
+      currentAlbumYear = album.year;
       showOnlyFavorites = false;
       document.getElementById('album-hero-img').src = album.cover || '';
       document.getElementById('album-year-label').textContent = album.year;
-      document.getElementById('album-title').textContent = album.path;
+      document.getElementById('album-title').textContent = album.name || album.path;
       document.getElementById('album-count').textContent = `${album.count} ${t('photos_upper')}`;
 
       const zipBtn = document.getElementById('album-zip-btn');
@@ -1032,9 +1157,17 @@
         zipBtn.classList.add('hidden');
       }
 
+      const hideBtn = document.getElementById('album-hide-btn');
+      if (currentUser && currentUser.role === 'admin') {
+        hideBtn.classList.remove('hidden');
+      }
+
       renderSidebarTree(cleanPath);
-      renderAlbumPhotos();
+      setTimeout(() => scrollSidebarTo(`sidebar-album-${encodeURIComponent(cleanPath)}`), 100);
+
       showHomeView(false, false);
+      renderAlbumPhotos();
+      renderSiblingNav();
     }
 
     function showHomeView(isHome = true, clearHash = true) {
@@ -1043,21 +1176,36 @@
       const mainContainer = document.getElementById('main-scroll-area');
 
       if (isHome) {
+        const yearToScroll = currentAlbumYear;
         currentAlbumPath = '';
         homeView.classList.remove('hidden');
         albumView.classList.add('hidden');
         renderSidebarTree('');
         if (clearHash) setHashSilently('');
+
+        if (yearToScroll) {
+          setTimeout(() => {
+            const targetEl = document.getElementById(safeYearId(yearToScroll));
+            if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            scrollSidebarTo(`sidebar-${safeYearId(yearToScroll)}`);
+          }, 50);
+        } else {
+          mainContainer.scrollTop = 0;
+        }
       } else {
         homeView.classList.add('hidden');
         albumView.classList.remove('hidden');
+        mainContainer.scrollTop = 0;
       }
-      mainContainer.scrollTop = 0;
     }
 
     function showHome() {
-      showHomeView(true, true);
-      loadStructure();
+      if (currentAlbumPath === '') {
+        currentAlbumYear = '';
+        document.getElementById('main-scroll-area').scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        showHomeView(true, true);
+      }
     }
 
     function setFavoritesFilter(onlyFavs) {
@@ -1094,11 +1242,11 @@
       displayedPhotos = getSortedPhotos(baseList);
 
       if (showOnlyFavorites) {
-        tabAll.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 transition';
-        tabFav.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5';
+        tabAll.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5 shadow-sm';
+        tabFav.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition';
       } else {
-        tabAll.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition';
-        tabFav.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition inline-flex items-center gap-1.5';
+        tabAll.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition';
+        tabFav.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5 shadow-sm';
       }
 
       if (favPhotos.length > 0) {
@@ -1114,9 +1262,14 @@
       }
 
       const grid = document.getElementById('photos-grid');
+      
       if (!displayedPhotos.length) {
         grid.className = '';
-        grid.innerHTML = `<p class="col-span-full text-center text-stone-400 tracking-widest uppercase text-xs py-16">${t('no_photos')}</p>`;
+        if (showOnlyFavorites) {
+          grid.innerHTML = `<div class="col-span-full text-center py-24"><p class="text-stone-400 tracking-widest uppercase text-sm mb-4">${t('fav_empty_title')}</p><p class="text-xs text-stone-500 max-w-sm mx-auto">${t('fav_empty_desc')}</p></div>`;
+        } else {
+          grid.innerHTML = `<p class="col-span-full text-center text-stone-400 tracking-widest uppercase text-xs py-16">${t('no_photos')}</p>`;
+        }
         return;
       }
 
@@ -1381,16 +1534,50 @@
       });
     })();
 
+    function renderHiddenAlbumsCheckboxes() {
+      const container = document.getElementById('hidden-albums-list');
+      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split(',').map(s=>s.trim()).filter(Boolean) : [];
+
+      if (hiddenList.length === 0) {
+        container.innerHTML = `<p class="text-xs text-stone-500 py-2">${t('no_hidden')}</p>`;
+        return;
+      }
+
+      let html = '';
+      hiddenList.forEach(folder => {
+        html += `<label class="flex items-center space-x-2 text-xs truncate cursor-pointer">
+          <input type="checkbox" value="${folder}" checked class="hidden-album-cb accent-stone-900 dark:accent-stone-100" />
+          <span class="truncate" title="${folder}">${folder}</span>
+        </label>`;
+      });
+      container.innerHTML = html;
+    }
+
+    function applyHiddenCheckboxes() {
+      const container = document.getElementById('hidden-albums-list');
+      if (!container) return;
+      if (container.querySelectorAll('.hidden-album-cb').length > 0) {
+         const keepHidden = Array.from(container.querySelectorAll('.hidden-album-cb')).filter(cb => cb.checked).map(cb => cb.value);
+         appSettings.hidden_folders = keepHidden.join(',');
+      } else if (container.innerHTML.includes('checkbox')) {
+         appSettings.hidden_folders = '';
+      } else {
+         appSettings.hidden_folders = '';
+      }
+    }
+
     async function openSettingsModal() {
       document.getElementById('pref-gallery-title').value = appSettings.gallery_title || 'PHOTO ARCHIVE';
       document.getElementById('opt-show-exif').checked = !!appSettings.show_exif;
       document.getElementById('opt-allow-zip').checked = !!appSettings.allow_zip_download;
+      document.getElementById('opt-show-hidden').checked = !!appSettings.show_hidden_albums;
       document.getElementById('opt-exclude-exts').value = appSettings.exclude_extensions || '';
       document.getElementById('opt-exclude-masks').value = appSettings.exclude_masks || '';
-      document.getElementById('opt-hidden-folders').value = appSettings.hidden_folders || '';
       document.getElementById('filter-saved-msg').classList.add('hidden');
       document.getElementById('title-saved-msg').classList.add('hidden');
+      
       renderAlbumCheckboxes();
+      renderHiddenAlbumsCheckboxes();
       await loadUsersList();
       await pollPregenStatus();
       document.getElementById('settings-modal').classList.remove('hidden');
@@ -1402,12 +1589,13 @@
     }
 
     async function saveGalleryTitleOnly() {
+      applyHiddenCheckboxes();
       appSettings.gallery_title = document.getElementById('pref-gallery-title').value;
       appSettings.show_exif = document.getElementById('opt-show-exif').checked;
       appSettings.allow_zip_download = document.getElementById('opt-allow-zip').checked;
+      appSettings.show_hidden_albums = document.getElementById('opt-show-hidden').checked;
       appSettings.exclude_extensions = document.getElementById('opt-exclude-exts').value;
       appSettings.exclude_masks = document.getElementById('opt-exclude-masks').value;
-      appSettings.hidden_folders = document.getElementById('opt-hidden-folders').value;
 
       const res = await fetch('/api/settings', {
         method: 'POST',
@@ -1513,7 +1701,7 @@
       let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
       for (const a of allAlbumsCatalog) {
         const isChecked = selectedAlbums.includes('*') || selectedAlbums.includes(a.path);
-        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${a.label}</span></label>`;
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${a.name || a.path}</span></label>`;
       }
       box.innerHTML = html;
     }
