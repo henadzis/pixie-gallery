@@ -4,11 +4,13 @@ import time
 import hashlib
 import zipfile
 import threading
+import gc
 from fnmatch import fnmatch
 from io import BytesIO
 from pathlib import Path
 from urllib.parse import quote, unquote
 from typing import Optional, List
+from collections import OrderedDict
 
 import jwt
 from fastapi import FastAPI, HTTPException, Request, Depends, Cookie, Response, BackgroundTasks
@@ -51,7 +53,9 @@ pregen_status = {
 pregen_lock = threading.Lock()
 db_lock = threading.Lock()
 exif_lock = threading.Lock()
-_exif_mem_cache: Optional[dict] = None
+
+MAX_EXIF_CACHE_SIZE = 1000
+_exif_mem_cache: Optional[OrderedDict] = None
 
 
 def default_settings_dict() -> dict:
@@ -62,6 +66,7 @@ def default_settings_dict() -> dict:
         "exclude_extensions": DEFAULT_EXCLUDE_EXTS,
         "exclude_masks": DEFAULT_EXCLUDE_MASKS,
         "hidden_folders": "",
+        "show_hidden_albums": False
     }
 
 
@@ -112,7 +117,7 @@ def save_db(data: dict):
             json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def load_exif_cache() -> dict:
+def load_exif_cache() -> OrderedDict:
     global _exif_mem_cache
     with exif_lock:
         if _exif_mem_cache is not None:
@@ -120,11 +125,12 @@ def load_exif_cache() -> dict:
         if EXIF_CACHE_FILE.exists():
             try:
                 with open(EXIF_CACHE_FILE, "r", encoding="utf-8") as f:
-                    _exif_mem_cache = json.load(f)
+                    data = json.load(f)
+                    _exif_mem_cache = OrderedDict(data)
                     return _exif_mem_cache
             except Exception:
                 pass
-        _exif_mem_cache = {}
+        _exif_mem_cache = OrderedDict()
         return _exif_mem_cache
 
 
@@ -282,8 +288,11 @@ def extract_exif_data_cached(orig_path: Path) -> tuple[dict, bool]:
 
     key = str(orig_path)
     cached_entry = cache.get(key)
-    if cached_entry and cached_entry.get("mtime") == mtime:
-        return cached_entry.get("data", {}), False
+    
+    with exif_lock:
+        if cached_entry and cached_entry.get("mtime") == mtime:
+            cache.move_to_end(key) # LRU: mark as recently used
+            return cached_entry.get("data", {}), False
 
     exif_info = {}
     try:
@@ -355,6 +364,9 @@ def extract_exif_data_cached(orig_path: Path) -> tuple[dict, bool]:
 
     with exif_lock:
         cache[key] = {"mtime": mtime, "data": exif_info}
+        if len(cache) > MAX_EXIF_CACHE_SIZE:
+            cache.popitem(last=False) # LRU: remove oldest
+
     return exif_info, True
 
 
@@ -370,6 +382,7 @@ class SettingsUpdateRequest(BaseModel):
     exclude_extensions: str = ""
     exclude_masks: str = ""
     hidden_folders: str = ""
+    show_hidden_albums: bool = False
 
 
 class UserUpsertRequest(BaseModel):
@@ -426,7 +439,8 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         "allow_zip_download": req.allow_zip_download,
         "exclude_extensions": req.exclude_extensions.strip(),
         "exclude_masks": req.exclude_masks.strip(),
-        "hidden_folders": req.hidden_folders.strip()
+        "hidden_folders": req.hidden_folders.strip(),
+        "show_hidden_albums": req.show_hidden_albums
     }
     save_db(db)
     return {"status": "ok", "settings": db["settings"]}
@@ -450,7 +464,8 @@ def clear_cache(user: dict = Depends(get_current_user)):
                     except Exception:
                         pass
     with exif_lock:
-        _exif_mem_cache = {}
+        _exif_mem_cache = OrderedDict()
+    gc.collect()
     return {"status": "ok", "deleted_files": count}
 
 
@@ -568,8 +583,12 @@ def run_all_thumbnails_task():
                 exif_dirty = True
         except Exception:
             pass
+        
         with pregen_lock:
             pregen_status["processed"] = idx
+            
+        if idx % 50 == 0:
+            gc.collect()
 
     if exif_dirty:
         save_exif_cache()
@@ -578,6 +597,8 @@ def run_all_thumbnails_task():
         pregen_status["running"] = False
         pregen_status["cancel_requested"] = False
         pregen_status["current_file"] = "DONE"
+    
+    gc.collect()
 
 
 @app.post("/api/pregenerate")
@@ -624,7 +645,7 @@ def get_pregenerate_status(user: dict = Depends(get_current_user)):
     return res
 
 
-def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list) -> list:
+def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list, show_hidden: bool) -> list:
     if not PHOTOS_DIR.exists():
         return []
 
@@ -636,7 +657,9 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
             continue
 
         rel_path = current_dir.relative_to(PHOTOS_DIR).as_posix()
-        if is_folder_hidden(rel_path, hidden_folders):
+        is_hidden = is_folder_hidden(rel_path, hidden_folders)
+        
+        if is_hidden and not show_hidden:
             continue
 
         valid_imgs = sorted(
@@ -653,7 +676,8 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
                 "path": rel_path,
                 "year": year_tag,
                 "count": len(valid_imgs),
-                "cover": f"/api/thumb/400/{quote(cover_rel)}"
+                "cover": f"/api/thumb/400/{quote(cover_rel)}",
+                "is_hidden": is_hidden
             })
 
     years_dict = {}
@@ -675,7 +699,9 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
 def get_structure(user: dict = Depends(get_current_user)):
     db = load_db()
     ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
-    raw_years = scan_all_albums_recursive(ex_exts, ex_masks, hidden_folders)
+    show_hidden = db.get("settings", {}).get("show_hidden_albums", False)
+    
+    raw_years = scan_all_albums_recursive(ex_exts, ex_masks, hidden_folders, show_hidden)
 
     filtered_years = []
     all_albums_flat = []
@@ -683,7 +709,7 @@ def get_structure(user: dict = Depends(get_current_user)):
     for y in raw_years:
         allowed_list = []
         for alb in y["albums"]:
-            all_albums_flat.append({"path": alb["path"], "label": f"{alb['path']}"})
+            all_albums_flat.append({"path": alb["path"], "label": f"{alb['path']}", "name": alb["name"]})
             if user_can_access_album(user, alb["path"]):
                 allowed_list.append(alb)
         if allowed_list:
