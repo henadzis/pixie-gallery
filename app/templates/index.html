@@ -1565,9 +1565,13 @@
 
       let html = '';
       hiddenList.forEach(folder => {
+        // Экранируем кавычки для защиты от поломки синтаксиса
+        const safeVal = folder.replace(/"/g, '&quot;');
+        const safeJS = folder.replace(/'/g, "\\'");
+        
         html += `<label class="flex items-center space-x-2 text-xs truncate cursor-pointer">
-          <input type="checkbox" value="${folder}" checked onchange="autoRemoveHiddenFolder(`${folder}`)" class="hidden-album-cb accent-stone-900 dark:accent-stone-100" />
-          <span class="truncate" title="${folder}">${folder}</span>
+          <input type="checkbox" value="${safeVal}" checked onchange="autoRemoveHiddenFolder('${safeJS}')" class="hidden-album-cb accent-stone-900 dark:accent-stone-100" />
+          <span class="truncate" title="${safeVal}">${folder}</span>
         </label>`;
       });
       container.innerHTML = html;
