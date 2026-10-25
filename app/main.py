@@ -172,9 +172,9 @@ def is_folder_hidden(rel_path: str, hidden_folders: list) -> bool:
     if not hidden_folders:
         return False
     norm_path = rel_path.strip("/").lower()
-    parts = norm_path.split("/")
     for h in hidden_folders:
-        if h in parts or any(p == h for p in parts) or norm_path.startswith(h + "/"):
+        norm_h = h.strip("/").lower()
+        if norm_path == norm_h or norm_path.startswith(norm_h + "/"):
             return True
     return False
 
@@ -671,8 +671,13 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
             parts = rel_path.split("/")
             year_tag = parts[0] if len(parts) > 0 else "Archive"
 
+            if len(parts) > 1:
+                display_name = "/".join(parts[1:])
+            else:
+                display_name = parts[0]
+
             albums_flat.append({
-                "name": current_dir.name,
+                "name": display_name,
                 "path": rel_path,
                 "year": year_tag,
                 "count": len(valid_imgs),
@@ -759,10 +764,16 @@ def get_album(album_path: str, user: dict = Depends(get_current_user)):
     if exif_dirty:
         save_exif_cache()
 
+    parts = rel_clean.split("/")
+    if len(parts) > 1:
+        display_name = "/".join(parts[1:])
+    else:
+        display_name = parts[0]
+
     return {
-        "name": target_dir.name,
+        "name": display_name,
         "path": rel_clean,
-        "year": rel_clean.split("/")[0] if "/" in rel_clean else "",
+        "year": parts[0] if parts else "",
         "count": len(photos),
         "cover": photos[0]["preview"] if photos else None,
         "photos": photos
