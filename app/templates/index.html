@@ -1099,6 +1099,11 @@
       }
       await loadStructure();
       showHome();
+      
+      const searchInput = document.getElementById('sidebar-search');
+      if (searchInput && searchInput.value) {
+          handleSearch(searchInput.value);
+      }
     }
 
     function renderSiblingNav() {
@@ -1564,6 +1569,7 @@
       } else {
          appSettings.hidden_folders = '';
       }
+      renderHiddenAlbumsCheckboxes();
     }
 
     async function openSettingsModal() {
