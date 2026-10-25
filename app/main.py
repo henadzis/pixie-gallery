@@ -164,7 +164,7 @@ def get_filter_rules(db: Optional[dict] = None):
         excluded_exts.add(clean)
 
     excluded_masks = [m.strip().lower() for m in raw_masks.split(",") if m.strip()]
-    hidden_folders = [h.strip().strip("/").lower() for h in raw_hidden.split(",") if h.strip()]
+    hidden_folders = [h.strip().strip("/").lower() for h in raw_hidden.split("|") if h.strip()]
     return excluded_exts, excluded_masks, hidden_folders
 
 
