@@ -1086,7 +1086,6 @@
     window.addEventListener('hashchange', handleHashNavigation);
 
     async function hideCurrentAlbum() {
-      if (!confirm(t('confirm_hide_album'))) return;
       let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
       if (!hiddenList.includes(currentAlbumPath)) {
         hiddenList.push(currentAlbumPath);
