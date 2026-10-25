@@ -1050,7 +1050,7 @@
           <div class="photo-grid">
             ${yearObj.albums.map(album => `
               <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="home-album-card group cursor-pointer" data-search="${album.path}" title="${album.path}">
-                <div class="aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
+                <div class="aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2 ring-2 ring-transparent group-hover:ring-stone-500 dark:group-hover:ring-stone-400 transition-all duration-300">
                   <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                 </div>
                 <h3 class="text-sm tracking-[0.15em] uppercase font-medium transition truncate ${album.is_hidden ? 'text-red-600 dark:text-red-400' : 'group-hover:text-stone-600 dark:group-hover:text-stone-300'}">${album.name}</h3>
@@ -1086,10 +1086,10 @@
 
     async function hideCurrentAlbum() {
       if (!confirm(t('confirm_hide_album'))) return;
-      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
       if (!hiddenList.includes(currentAlbumPath)) {
         hiddenList.push(currentAlbumPath);
-        appSettings.hidden_folders = hiddenList.join(',');
+        appSettings.hidden_folders = hiddenList.join('|');
         
         await fetch('/api/settings', {
           method: 'POST',
@@ -1282,7 +1282,7 @@
       grid.className = isCrop ? 'photo-grid' : 'justified-grid';
 
       grid.innerHTML = displayedPhotos.map((p, idx) => `
-        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
+        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ring-2 ring-transparent hover:ring-stone-500 dark:hover:ring-stone-400 hover:z-10 transition-all duration-300 ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
           <img src="${p.thumb}" loading="lazy" alt="${p.name}" 
                onload="if(!${isCrop}) { this.parentElement.style.flexGrow = this.naturalWidth / this.naturalHeight; this.parentElement.style.flexBasis = (this.naturalWidth / this.naturalHeight * this.parentElement.clientHeight) + 'px'; }"
                onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:opacity-95 transition duration-300" />
@@ -1539,9 +1539,24 @@
       });
     })();
 
+    async function autoRemoveHiddenFolder(folderToRemove) {
+      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
+      hiddenList = hiddenList.filter(f => f !== folderToRemove);
+      appSettings.hidden_folders = hiddenList.join('|');
+      
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appSettings)
+      });
+      
+      renderHiddenAlbumsCheckboxes();
+      await loadStructure();
+    }
+
     function renderHiddenAlbumsCheckboxes() {
       const container = document.getElementById('hidden-albums-list');
-      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split(',').map(s=>s.trim()).filter(Boolean) : [];
+      let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
 
       if (hiddenList.length === 0) {
         container.innerHTML = `<p class="text-xs text-stone-500 py-2">${t('no_hidden')}</p>`;
@@ -1551,7 +1566,7 @@
       let html = '';
       hiddenList.forEach(folder => {
         html += `<label class="flex items-center space-x-2 text-xs truncate cursor-pointer">
-          <input type="checkbox" value="${folder}" checked class="hidden-album-cb accent-stone-900 dark:accent-stone-100" />
+          <input type="checkbox" value="${folder}" checked onchange="autoRemoveHiddenFolder(`${folder}`)" class="hidden-album-cb accent-stone-900 dark:accent-stone-100" />
           <span class="truncate" title="${folder}">${folder}</span>
         </label>`;
       });
@@ -1563,7 +1578,7 @@
       if (!container) return;
       if (container.querySelectorAll('.hidden-album-cb').length > 0) {
          const keepHidden = Array.from(container.querySelectorAll('.hidden-album-cb')).filter(cb => cb.checked).map(cb => cb.value);
-         appSettings.hidden_folders = keepHidden.join(',');
+         appSettings.hidden_folders = keepHidden.join('|');
       } else if (container.innerHTML.includes('checkbox')) {
          appSettings.hidden_folders = '';
       } else {
