@@ -1286,7 +1286,7 @@
         <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
           <img src="${p.thumb}" loading="lazy" alt="${p.name}" 
                onload="if(!${isCrop}) { this.parentElement.style.flexGrow = this.naturalWidth / this.naturalHeight; this.parentElement.style.flexBasis = (this.naturalWidth / this.naturalHeight * this.parentElement.clientHeight) + 'px'; }"
-               onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer transition duration-300" />
+               onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:scale-105 transition-transform duration-700 ease-out" />
           <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
           <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
             ${p.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline}
