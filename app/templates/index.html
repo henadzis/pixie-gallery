@@ -1050,8 +1050,9 @@
           <div class="photo-grid">
             ${yearObj.albums.map(album => `
               <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="home-album-card group cursor-pointer" data-search="${album.path}" title="${album.path}">
-                <div class="aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2 ring-2 ring-transparent group-hover:ring-stone-500 dark:group-hover:ring-stone-400 transition-all duration-300">
+                <div class="relative aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
                   <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                  <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
                 </div>
                 <h3 class="text-sm tracking-[0.15em] uppercase font-medium transition truncate ${album.is_hidden ? 'text-red-600 dark:text-red-400' : 'group-hover:text-stone-600 dark:group-hover:text-stone-300'}">${album.name}</h3>
                 <p class="text-xs tracking-[0.15em] text-stone-400 uppercase mt-0.5">${album.count} ${t('photos_count')}</p>
@@ -1282,11 +1283,12 @@
       grid.className = isCrop ? 'photo-grid' : 'justified-grid';
 
       grid.innerHTML = displayedPhotos.map((p, idx) => `
-        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ring-2 ring-transparent hover:ring-stone-500 dark:hover:ring-stone-400 hover:z-10 transition-all duration-300 ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
+        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
           <img src="${p.thumb}" loading="lazy" alt="${p.name}" 
                onload="if(!${isCrop}) { this.parentElement.style.flexGrow = this.naturalWidth / this.naturalHeight; this.parentElement.style.flexBasis = (this.naturalWidth / this.naturalHeight * this.parentElement.clientHeight) + 'px'; }"
-               onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:opacity-95 transition duration-300" />
-          <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
+               onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer transition duration-300" />
+          <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
+          <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
             ${p.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline}
           </button>
         </div>
