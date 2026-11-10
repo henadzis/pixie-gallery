@@ -397,6 +397,17 @@ class FavoriteToggleRequest(BaseModel):
     photo_path: str
 
 
+@app.get("/pixie_gallery.svg", include_in_schema=False)
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    svg_path = Path(__file__).parent / "static" / "pixie_gallery.svg"
+    if not svg_path.exists():
+        svg_path = Path(__file__).parent.parent / "pixie_gallery.svg"
+    if svg_path.exists():
+        return FileResponse(svg_path, media_type="image/svg+xml")
+    raise HTTPException(status_code=404, detail="Favicon not found")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     db = load_db()

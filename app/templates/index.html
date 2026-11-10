@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ title }}</title>
+  <link rel="icon" type="image/svg+xml" href="/pixie_gallery.svg" />
+  <link rel="alternate icon" href="/favicon.ico" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/pixie_gallery.svg" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = { darkMode: 'class' }
@@ -85,6 +88,9 @@
         </button>
         <button type="button" onclick="toggleLanguage()" id="login-lang-btn" class="text-[11px] tracking-[0.15em] uppercase px-2 py-1 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 transition">RU</button>
       </div>
+      <div class="flex justify-center mb-2">
+        <img src="/pixie_gallery.svg" alt="Pixie Logo" class="w-12 h-12 object-contain" />
+      </div>
       <h1 class="serif-title text-3xl tracking-[0.2em] uppercase mb-2 mt-2" id="login-modal-title">{{ title }}</h1>
       <p class="text-xs tracking-[0.15em] uppercase text-stone-400 mb-8" data-i18n="login_subtitle">Клиентский вход в галерею</p>
       <form onsubmit="handleLogin(event)" class="space-y-4 text-left">
@@ -122,8 +128,11 @@
           <span class="hidden sm:inline" data-i18n="nav_home">На главную</span>
         </button>
 
-        <button onclick="showHome()" id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium hover:opacity-70 transition text-left ml-1 truncate">
-          {{ title }}
+        <button onclick="showHome()" class="inline-flex items-center gap-2.5 hover:opacity-70 transition text-left ml-1 min-w-0">
+          <img src="/pixie_gallery.svg" alt="Pixie Logo" class="w-7 h-7 object-contain shrink-0" />
+          <span id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium truncate">
+            {{ title }}
+          </span>
         </button>
       </div>
 
