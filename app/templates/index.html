@@ -488,16 +488,16 @@
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_libraries">Библиотеки фотографий (папки)</h3>
         <div id="libraries-list" class="space-y-2 text-xs"></div>
 
-        <form onsubmit="handleSaveLibrary(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+        <form id="library-form" onsubmit="handleSaveLibrary(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
           <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="lib-form-title" data-i18n="lib_form_title">Добавить или изменить библиотеку</div>
           <input id="edit-lib-id" type="hidden" value="" />
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input id="new-lib-name" type="text" data-i18n-placeholder="lib_ph_name" placeholder="Название (напр. Семейный архив)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-            <input id="new-lib-path" type="text" data-i18n-placeholder="lib_ph_path" placeholder="Путь в контейнере (напр. /photos_family)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs font-mono" />
+            <input id="edit-lib-name" type="text" data-i18n-placeholder="lib_ph_name" placeholder="Название (напр. Семейный архив)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <input id="edit-lib-path" type="text" data-i18n-placeholder="lib_ph_path" placeholder="Путь в контейнере (напр. /photos_family)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs font-mono" />
           </div>
           <div class="flex items-center gap-2">
             <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_lib">Сохранить библиотеку</button>
-            <button type="button" id="cancel-lib-edit-btn" onclick="resetLibraryForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+            <button type="button" id="btn-cancel-lib-edit" onclick="resetLibraryForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
           </div>
         </form>
       </div>
@@ -1893,9 +1893,14 @@
 
     function editLibraryPrompt(id, name, path) {
       document.getElementById('edit-lib-id').value = id;
-      document.getElementById('edit-lib-name').value = name;
-      document.getElementById('edit-lib-path').value = path;
-      document.getElementById('btn-cancel-lib-edit').classList.remove('hidden');
+      const nameInput = document.getElementById('edit-lib-name');
+      const pathInput = document.getElementById('edit-lib-path');
+      nameInput.value = name;
+      pathInput.value = path;
+      const cancelBtn = document.getElementById('btn-cancel-lib-edit');
+      if (cancelBtn) cancelBtn.classList.remove('hidden');
+      nameInput.focus();
+      nameInput.select();
     }
 
     function resetLibraryForm() {
