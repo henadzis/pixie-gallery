@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import hashlib
@@ -53,9 +54,20 @@ pregen_status = {
 pregen_lock = threading.Lock()
 db_lock = threading.Lock()
 exif_lock = threading.Lock()
+thumb_semaphore = threading.Semaphore(2)
 
 MAX_EXIF_CACHE_SIZE = 1000
 _exif_mem_cache: Optional[OrderedDict] = None
+
+
+def default_libraries_list() -> list:
+    return [
+        {
+            "id": "default",
+            "name": "Основной архив",
+            "path": str(PHOTOS_DIR)
+        }
+    ]
 
 
 def default_settings_dict() -> dict:
@@ -66,7 +78,8 @@ def default_settings_dict() -> dict:
         "exclude_extensions": DEFAULT_EXCLUDE_EXTS,
         "exclude_masks": DEFAULT_EXCLUDE_MASKS,
         "hidden_folders": "",
-        "show_hidden_albums": False
+        "show_hidden_albums": False,
+        "libraries": default_libraries_list()
     }
 
 
@@ -79,7 +92,8 @@ def load_db() -> dict:
                     "password": hashlib.sha256(ADMIN_PASS.encode()).hexdigest(),
                     "role": "admin",
                     "mode": "allow",
-                    "allowed_albums": ["*"]
+                    "allowed_albums": ["*"],
+                    "allowed_libraries": ["*"]
                 }
             },
             "favorites": {}
@@ -92,14 +106,19 @@ def load_db() -> dict:
         s = db.setdefault("settings", {})
         for k, v in default_settings_dict().items():
             s.setdefault(k, v)
+        if not s.get("libraries") or not isinstance(s.get("libraries"), list):
+            s["libraries"] = default_libraries_list()
         db.setdefault("users", {})
         db.setdefault("favorites", {})
+        for uname, uobj in db["users"].items():
+            uobj.setdefault("allowed_libraries", ["*"])
         if ADMIN_USER not in db["users"]:
             db["users"][ADMIN_USER] = {
                 "password": hashlib.sha256(ADMIN_PASS.encode()).hexdigest(),
                 "role": "admin",
                 "mode": "allow",
-                "allowed_albums": ["*"]
+                "allowed_albums": ["*"],
+                "allowed_libraries": ["*"]
             }
             save_db(db)
         return db
@@ -115,6 +134,34 @@ def save_db(data: dict):
     with db_lock:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def get_libraries_list(db: Optional[dict] = None) -> list:
+    if db is None:
+        db = load_db()
+    libs = db.get("settings", {}).get("libraries", [])
+    if not libs or not isinstance(libs, list):
+        return default_libraries_list()
+    return libs
+
+
+def get_library_root(lib_id: Optional[str] = "default", db: Optional[dict] = None) -> tuple[str, Path, str]:
+    libs = get_libraries_list(db)
+    target_id = (lib_id or "default").strip() or "default"
+    found = None
+    for lib in libs:
+        if lib.get("id") == target_id:
+            found = lib
+            break
+    if not found:
+        raise HTTPException(status_code=404, detail="Library not found")
+
+    raw_path = Path(found.get("path", str(PHOTOS_DIR)))
+    if found.get("id") == "default" and not raw_path.exists() and PHOTOS_DIR.exists():
+        root_path = PHOTOS_DIR
+    else:
+        root_path = raw_path.resolve()
+    return found["id"], root_path, found.get("name", found["id"])
 
 
 def load_exif_cache() -> OrderedDict:
@@ -168,14 +215,19 @@ def get_filter_rules(db: Optional[dict] = None):
     return excluded_exts, excluded_masks, hidden_folders
 
 
-def is_folder_hidden(rel_path: str, hidden_folders: list) -> bool:
+def is_folder_hidden(rel_path: str, hidden_folders: list, lib_id: str = "default") -> bool:
     if not hidden_folders:
         return False
     norm_path = rel_path.strip("/").lower()
+    prefixed_path = f"{lib_id.lower()}::{norm_path}"
     for h in hidden_folders:
         norm_h = h.strip("/").lower()
-        if norm_path == norm_h or norm_path.startswith(norm_h + "/"):
-            return True
+        if "::" in norm_h:
+            if prefixed_path == norm_h or prefixed_path.startswith(norm_h + "/"):
+                return True
+        elif lib_id == "default":
+            if norm_path == norm_h or norm_path.startswith(norm_h + "/"):
+                return True
     return False
 
 
@@ -218,22 +270,35 @@ def get_current_user(pixie_token: Optional[str] = Cookie(default=None)) -> dict:
             "username": username,
             "role": user_obj.get("role", "user"),
             "mode": user_obj.get("mode", "allow"),
-            "allowed_albums": user_obj.get("allowed_albums", [])
+            "allowed_albums": user_obj.get("allowed_albums", []),
+            "allowed_libraries": user_obj.get("allowed_libraries", ["*"])
         }
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
-def safe_resolve(rel_path: str) -> Path:
-    target = (PHOTOS_DIR / rel_path).resolve()
-    if not str(target).startswith(str(PHOTOS_DIR)):
+def safe_resolve(rel_path: str, lib_id: Optional[str] = "default", db: Optional[dict] = None) -> Path:
+    _, lib_root, _ = get_library_root(lib_id, db)
+    target = (lib_root / rel_path).resolve()
+    if not str(target).startswith(str(lib_root)):
         raise HTTPException(status_code=403, detail="Access denied")
     if not target.exists():
         raise HTTPException(status_code=404, detail="Not found")
     return target
 
 
-def user_can_access_album(user: dict, album_rel_path: str) -> bool:
+def user_can_access_library(user: dict, lib_id: str) -> bool:
+    if user["role"] == "admin":
+        return True
+    allowed_libs = user.get("allowed_libraries", ["*"])
+    if "*" in allowed_libs or lib_id in allowed_libs:
+        return True
+    return False
+
+
+def user_can_access_album(user: dict, album_rel_path: str, lib_id: str = "default") -> bool:
+    if not user_can_access_library(user, lib_id):
+        return False
     if user["role"] == "admin":
         return True
     mode = user.get("mode", "allow")
@@ -242,21 +307,29 @@ def user_can_access_album(user: dict, album_rel_path: str) -> bool:
         return True if mode == "allow" else False
 
     norm_album = album_rel_path.strip("/")
+    prefixed_album = f"{lib_id}::{norm_album}"
     matched = False
     for allowed in albums:
         norm_allowed = allowed.strip("/")
-        if norm_album == norm_allowed or norm_album.startswith(norm_allowed + "/"):
-            matched = True
-            break
+        if "::" in norm_allowed:
+            if prefixed_album == norm_allowed or prefixed_album.startswith(norm_allowed + "/"):
+                matched = True
+                break
+        elif lib_id == "default":
+            if norm_album == norm_allowed or norm_album.startswith(norm_allowed + "/"):
+                matched = True
+                break
 
     return matched if mode == "allow" else not matched
 
 
-def user_can_access_image(user: dict, img_rel_path: str) -> bool:
+def user_can_access_image(user: dict, img_rel_path: str, lib_id: str = "default") -> bool:
+    if not user_can_access_library(user, lib_id):
+        return False
     if user["role"] == "admin":
         return True
     parent_album = str(Path(img_rel_path).parent.as_posix())
-    return user_can_access_album(user, parent_album)
+    return user_can_access_album(user, parent_album, lib_id)
 
 
 def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
@@ -266,15 +339,25 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
     hash_name = f"{hashlib.md5(cache_key).hexdigest()}_{target_size}.webp"
     cache_file = CACHE_DIR / hash_name[:2] / hash_name
 
-    if not cache_file.exists():
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-        with Image.open(orig_path) as img:
-            img = ImageOps.exif_transpose(img)
-            if img.mode != "RGB":
-                img = img.convert("RGB")
-            img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
-            quality = 85 if target_size == 1200 else 80
-            img.save(cache_file, "WEBP", quality=quality)
+    if cache_file.exists():
+        return cache_file
+
+    with thumb_semaphore:
+        if not cache_file.exists():
+            cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with Image.open(orig_path) as img:
+                if hasattr(img, "draft") and img.format in ("JPEG", "MPO"):
+                    try:
+                        img.draft("RGB", (target_size * 2, target_size * 2))
+                    except Exception:
+                        pass
+                img = ImageOps.exif_transpose(img)
+                if img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+                quality = 85 if target_size == 1200 else 80
+                img.save(cache_file, "WEBP", quality=quality)
+            gc.collect()
     return cache_file
 
 
@@ -385,16 +468,24 @@ class SettingsUpdateRequest(BaseModel):
     show_hidden_albums: bool = False
 
 
+class LibraryUpsertRequest(BaseModel):
+    id: Optional[str] = None
+    name: str
+    path: str
+
+
 class UserUpsertRequest(BaseModel):
     username: str
     password: Optional[str] = None
     role: str = "user"
     mode: str = "allow"
     allowed_albums: List[str] = []
+    allowed_libraries: List[str] = ["*"]
 
 
 class FavoriteToggleRequest(BaseModel):
     photo_path: str
+    lib: Optional[str] = "default"
 
 
 @app.get("/pixie_gallery.svg", include_in_schema=False)
@@ -444,6 +535,7 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     db = load_db()
+    existing_libs = get_libraries_list(db)
     db["settings"] = {
         "gallery_title": req.gallery_title.strip() or "PHOTO ARCHIVE",
         "show_exif": req.show_exif,
@@ -451,10 +543,96 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         "exclude_extensions": req.exclude_extensions.strip(),
         "exclude_masks": req.exclude_masks.strip(),
         "hidden_folders": req.hidden_folders.strip(),
-        "show_hidden_albums": req.show_hidden_albums
+        "show_hidden_albums": req.show_hidden_albums,
+        "libraries": existing_libs
     }
     save_db(db)
     return {"status": "ok", "settings": db["settings"]}
+
+
+def _format_libraries_response(db: dict, user: dict) -> list:
+    libs = get_libraries_list(db)
+    out = []
+    for lib in libs:
+        lid = lib.get("id", "default")
+        if not user_can_access_library(user, lid):
+            continue
+        raw_p = Path(lib.get("path", str(PHOTOS_DIR)))
+        if lid == "default" and not raw_p.exists() and PHOTOS_DIR.exists():
+            resolved_p = PHOTOS_DIR
+        else:
+            resolved_p = raw_p
+        item = {
+            "id": lid,
+            "name": lib.get("name", lid)
+        }
+        if user["role"] == "admin":
+            item["path"] = lib.get("path", str(PHOTOS_DIR))
+            item["exists"] = resolved_p.is_dir()
+        out.append(item)
+    return out
+
+
+@app.get("/api/libraries")
+def list_libraries(user: dict = Depends(get_current_user)):
+    db = load_db()
+    return {"libraries": _format_libraries_response(db, user)}
+
+
+@app.post("/api/libraries")
+def save_library(req: LibraryUpsertRequest, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    name = req.name.strip()
+    path_str = req.path.strip()
+    if not name or not path_str:
+        raise HTTPException(status_code=400, detail="Name and path are required")
+
+    db = load_db()
+    libs = get_libraries_list(db)
+
+    if req.id:
+        target_id = req.id.strip()
+        updated = False
+        for lib in libs:
+            if lib.get("id") == target_id:
+                lib["name"] = name
+                lib["path"] = path_str
+                updated = True
+                break
+        if not updated:
+            libs.append({"id": target_id, "name": name, "path": path_str})
+    else:
+        slug = re.sub(r"[^a-zA-Z0-9_-]", "", name.lower().replace(" ", "_"))
+        if not slug:
+            slug = "lib"
+        existing_ids = {l.get("id") for l in libs}
+        candidate = slug
+        counter = 2
+        while candidate in existing_ids:
+            candidate = f"{slug}_{counter}"
+            counter += 1
+        libs.append({"id": candidate, "name": name, "path": path_str})
+
+    db.setdefault("settings", {})["libraries"] = libs
+    save_db(db)
+    return {"status": "ok", "libraries": _format_libraries_response(db, user)}
+
+
+@app.delete("/api/libraries/{lib_id}")
+def delete_library(lib_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = load_db()
+    libs = get_libraries_list(db)
+    if len(libs) <= 1:
+        raise HTTPException(status_code=400, detail="Cannot delete the only library")
+    new_libs = [l for l in libs if l.get("id") != lib_id]
+    if len(new_libs) == len(libs):
+        raise HTTPException(status_code=404, detail="Library not found")
+    db.setdefault("settings", {})["libraries"] = new_libs
+    save_db(db)
+    return {"status": "ok", "libraries": _format_libraries_response(db, user)}
 
 
 @app.post("/api/cache/clear")
@@ -493,6 +671,7 @@ def list_users(user: dict = Depends(get_current_user)):
             "role": udata.get("role", "user"),
             "mode": udata.get("mode", "allow"),
             "allowed_albums": udata.get("allowed_albums", []),
+            "allowed_libraries": udata.get("allowed_libraries", ["*"]),
             "favorites_count": fav_count
         })
     return {"users": result}
@@ -515,7 +694,8 @@ def save_user(req: UserUpsertRequest, user: dict = Depends(get_current_user)):
         "password": pw_hash,
         "role": req.role,
         "mode": req.mode,
-        "allowed_albums": req.allowed_albums
+        "allowed_albums": req.allowed_albums,
+        "allowed_libraries": req.allowed_libraries if req.allowed_libraries else ["*"]
     }
     save_db(db)
     return {"status": "ok"}
@@ -537,39 +717,53 @@ def delete_user(uname: str, user: dict = Depends(get_current_user)):
 @app.post("/api/favorites/toggle")
 def toggle_favorite(req: FavoriteToggleRequest, user: dict = Depends(get_current_user)):
     rel_clean = unquote(req.photo_path).strip("/")
-    if not user_can_access_image(user, rel_clean):
-        raise HTTPException(status_code=403, detail="Access denied")
-    orig_path = safe_resolve(rel_clean)
     db = load_db()
+    lib_id, _, _ = get_library_root(req.lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    orig_path = safe_resolve(rel_clean, lib_id, db)
     ex_exts, ex_masks, _ = get_filter_rules(db)
     if not is_valid_image(orig_path, ex_exts, ex_masks):
         raise HTTPException(status_code=404, detail="Image not found")
     uname = user["username"]
     user_favs = set(db.setdefault("favorites", {}).get(uname, []))
-    if rel_clean in user_favs:
-        user_favs.remove(rel_clean)
+    fav_key = rel_clean if lib_id == "default" else f"{lib_id}::{rel_clean}"
+    if fav_key in user_favs:
+        user_favs.remove(fav_key)
         is_favorite = False
     else:
-        user_favs.add(rel_clean)
+        user_favs.add(fav_key)
         is_favorite = True
     db["favorites"][uname] = sorted(list(user_favs))
     save_db(db)
-    return {"status": "ok", "photo_path": rel_clean, "is_favorite": is_favorite}
+    return {"status": "ok", "photo_path": rel_clean, "lib": lib_id, "is_favorite": is_favorite}
 
 
 def run_all_thumbnails_task():
     global pregen_status
-    ex_exts, ex_masks, hidden_folders = get_filter_rules()
+    db = load_db()
+    ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
+    libs = get_libraries_list(db)
     all_images = []
-    if PHOTOS_DIR.exists():
-        for root, dirs, files in os.walk(PHOTOS_DIR):
+
+    for lib in libs:
+        if pregen_status["cancel_requested"]:
+            break
+        lid = lib.get("id", "default")
+        try:
+            _, lib_root, _ = get_library_root(lid, db)
+        except Exception:
+            continue
+        if not lib_root.exists():
+            continue
+        for root, dirs, files in os.walk(lib_root):
             if pregen_status["cancel_requested"]:
                 break
             dirs[:] = [d for d in dirs if not d.startswith(".")]
             current_dir = Path(root)
-            if current_dir != PHOTOS_DIR:
-                rel = current_dir.relative_to(PHOTOS_DIR).as_posix()
-                if is_folder_hidden(rel, hidden_folders):
+            if current_dir != lib_root:
+                rel = current_dir.relative_to(lib_root).as_posix()
+                if is_folder_hidden(rel, hidden_folders, lid):
                     continue
             for f in files:
                 p = Path(root) / f
@@ -656,19 +850,29 @@ def get_pregenerate_status(user: dict = Depends(get_current_user)):
     return res
 
 
-def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list, show_hidden: bool) -> list:
-    if not PHOTOS_DIR.exists():
+def scan_all_albums_recursive(
+    ex_exts: set,
+    ex_masks: list,
+    hidden_folders: list,
+    show_hidden: bool,
+    lib_id: str = "default",
+    lib_root: Optional[Path] = None
+) -> list:
+    if lib_root is None:
+        _, lib_root, _ = get_library_root(lib_id)
+    if not lib_root.exists():
         return []
 
     albums_flat = []
-    for root, dirs, files in os.walk(PHOTOS_DIR):
+    q_lib = quote(lib_id)
+    for root, dirs, files in os.walk(lib_root):
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         current_dir = Path(root)
-        if current_dir == PHOTOS_DIR:
+        if current_dir == lib_root:
             continue
 
-        rel_path = current_dir.relative_to(PHOTOS_DIR).as_posix()
-        is_hidden = is_folder_hidden(rel_path, hidden_folders)
+        rel_path = current_dir.relative_to(lib_root).as_posix()
+        is_hidden = is_folder_hidden(rel_path, hidden_folders, lib_id)
         
         if is_hidden and not show_hidden:
             continue
@@ -678,7 +882,7 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
             key=lambda x: x.name
         )
         if valid_imgs:
-            cover_rel = valid_imgs[0].relative_to(PHOTOS_DIR).as_posix()
+            cover_rel = valid_imgs[0].relative_to(lib_root).as_posix()
             parts = rel_path.split("/")
             year_tag = parts[0] if len(parts) > 0 else "Archive"
 
@@ -692,7 +896,7 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
                 "path": rel_path,
                 "year": year_tag,
                 "count": len(valid_imgs),
-                "cover": f"/api/thumb/400/{quote(cover_rel)}",
+                "cover": f"/api/thumb/400/{quote(cover_rel)}?lib={q_lib}",
                 "is_hidden": is_hidden
             })
 
@@ -712,40 +916,93 @@ def scan_all_albums_recursive(ex_exts: set, ex_masks: list, hidden_folders: list
 
 
 @app.get("/api/structure")
-def get_structure(user: dict = Depends(get_current_user)):
+def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_user)):
     db = load_db()
     ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
     show_hidden = db.get("settings", {}).get("show_hidden_albums", False)
-    
-    raw_years = scan_all_albums_recursive(ex_exts, ex_masks, hidden_folders, show_hidden)
+
+    accessible_libs = _format_libraries_response(db, user)
+    if not accessible_libs:
+        return {
+            "libraries": [],
+            "active_library": None,
+            "years": [],
+            "all_albums_catalog": []
+        }
+
+    requested_id = (lib or "").strip()
+    active_lib = next((l for l in accessible_libs if l["id"] == requested_id), accessible_libs[0])
+    active_id = active_lib["id"]
+    _, active_root, _ = get_library_root(active_id, db)
+
+    raw_years = scan_all_albums_recursive(
+        ex_exts, ex_masks, hidden_folders, show_hidden,
+        lib_id=active_id, lib_root=active_root
+    )
 
     filtered_years = []
-    all_albums_flat = []
+    active_albums_flat = []
 
     for y in raw_years:
         allowed_list = []
         for alb in y["albums"]:
-            all_albums_flat.append({"path": alb["path"], "label": f"{alb['path']}", "name": alb["name"]})
-            if user_can_access_album(user, alb["path"]):
+            if user_can_access_album(user, alb["path"], active_id):
                 allowed_list.append(alb)
+                active_albums_flat.append({
+                    "path": alb["path"],
+                    "label": alb["path"],
+                    "name": alb["name"]
+                })
         if allowed_list:
             filtered_years.append({"year": y["year"], "albums": allowed_list})
 
+    admin_catalog = []
+    if user["role"] == "admin":
+        all_libs = get_libraries_list(db)
+        multi = len(all_libs) > 1
+        for lobj in all_libs:
+            lid = lobj.get("id", "default")
+            lname = lobj.get("name", lid)
+            try:
+                _, lroot, _ = get_library_root(lid, db)
+            except Exception:
+                continue
+            lyears = scan_all_albums_recursive(
+                ex_exts, ex_masks, hidden_folders, show_hidden,
+                lib_id=lid, lib_root=lroot
+            )
+            for y in lyears:
+                for alb in y["albums"]:
+                    perm_key = alb["path"] if lid == "default" else f"{lid}::{alb['path']}"
+                    disp_label = f"[{lname}] {alb['path']}" if multi else alb["path"]
+                    disp_name = f"[{lname}] {alb['name']}" if multi else alb["name"]
+                    admin_catalog.append({
+                        "path": perm_key,
+                        "label": disp_label,
+                        "name": disp_name,
+                        "lib_id": lid,
+                        "rel_path": alb["path"]
+                    })
+
     return {
+        "libraries": accessible_libs,
+        "active_library": active_lib,
         "years": filtered_years,
-        "all_albums_catalog": all_albums_flat if user["role"] == "admin" else []
+        "sibling_catalog": active_albums_flat,
+        "all_albums_catalog": admin_catalog if user["role"] == "admin" else active_albums_flat
     }
 
 
 @app.get("/api/album/{album_path:path}")
-def get_album(album_path: str, user: dict = Depends(get_current_user)):
+def get_album(album_path: str, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
     rel_clean = unquote(album_path).strip("/")
-    if not user_can_access_album(user, rel_clean):
+    db = load_db()
+    lib_id, lib_root, _ = get_library_root(lib, db)
+    if not user_can_access_album(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
-    target_dir = safe_resolve(rel_clean)
+    target_dir = safe_resolve(rel_clean, lib_id, db)
     if not target_dir.is_dir():
         raise HTTPException(status_code=404, detail="Album not found")
-    db = load_db()
     ex_exts, ex_masks, _ = get_filter_rules(db)
     show_exif = db.get("settings", {}).get("show_exif", True)
     user_favs = set(db.get("favorites", {}).get(user["username"], []))
@@ -753,21 +1010,23 @@ def get_album(album_path: str, user: dict = Depends(get_current_user)):
     images = sorted([f for f in target_dir.iterdir() if is_valid_image(f, ex_exts, ex_masks)], key=lambda x: x.name)
     photos = []
     exif_dirty = False
+    q_lib = quote(lib_id)
 
     for img in images:
-        rel = img.relative_to(PHOTOS_DIR).as_posix()
+        rel = img.relative_to(lib_root).as_posix()
         q_rel = quote(rel)
         exif_data, updated = extract_exif_data_cached(img)
         if updated:
             exif_dirty = True
 
+        fav_key = rel if lib_id == "default" else f"{lib_id}::{rel}"
         photos.append({
             "name": img.name,
             "path": rel,
-            "thumb": f"/api/thumb/400/{q_rel}",
-            "preview": f"/api/thumb/1200/{q_rel}",
-            "original": f"/api/original/{q_rel}",
-            "is_favorite": rel in user_favs,
+            "thumb": f"/api/thumb/400/{q_rel}?lib={q_lib}",
+            "preview": f"/api/thumb/1200/{q_rel}?lib={q_lib}",
+            "original": f"/api/original/{q_rel}?lib={q_lib}",
+            "is_favorite": fav_key in user_favs,
             "sort_date": exif_data.get("sort_date", ""),
             "exif": exif_data if show_exif else {}
         })
@@ -784,6 +1043,7 @@ def get_album(album_path: str, user: dict = Depends(get_current_user)):
     return {
         "name": display_name,
         "path": rel_clean,
+        "lib": lib_id,
         "year": parts[0] if parts else "",
         "count": len(photos),
         "cover": photos[0]["preview"] if photos else None,
@@ -792,21 +1052,31 @@ def get_album(album_path: str, user: dict = Depends(get_current_user)):
 
 
 @app.get("/api/download-zip/{album_path:path}")
-def download_album_zip(album_path: str, favorites_only: bool = False, user: dict = Depends(get_current_user)):
+def download_album_zip(
+    album_path: str,
+    favorites_only: bool = False,
+    lib: Optional[str] = "default",
+    user: dict = Depends(get_current_user)
+):
     rel_clean = unquote(album_path).strip("/")
-    if not user_can_access_album(user, rel_clean):
-        raise HTTPException(status_code=403, detail="Access denied")
     db = load_db()
+    lib_id, lib_root, _ = get_library_root(lib, db)
+    if not user_can_access_album(user, rel_clean, lib_id):
+        raise HTTPException(status_code=403, detail="Access denied")
     if not db.get("settings", {}).get("allow_zip_download", True) and user["role"] != "admin":
         raise HTTPException(status_code=403, detail="ZIP download disabled")
-    target_dir = safe_resolve(rel_clean)
+    target_dir = safe_resolve(rel_clean, lib_id, db)
     if not target_dir.is_dir():
         raise HTTPException(status_code=404, detail="Album not found")
     ex_exts, ex_masks, _ = get_filter_rules(db)
     user_favs = set(db.get("favorites", {}).get(user["username"], []))
     images = sorted([f for f in target_dir.iterdir() if is_valid_image(f, ex_exts, ex_masks)], key=lambda x: x.name)
     if favorites_only:
-        images = [img for img in images if img.relative_to(PHOTOS_DIR).as_posix() in user_favs]
+        def _is_fav(img_p: Path) -> bool:
+            r = img_p.relative_to(lib_root).as_posix()
+            fk = r if lib_id == "default" else f"{lib_id}::{r}"
+            return fk in user_favs
+        images = [img for img in images if _is_fav(img)]
     if not images:
         raise HTTPException(status_code=404, detail="No photos to download")
     zip_buffer = BytesIO()
@@ -823,11 +1093,13 @@ def download_album_zip(album_path: str, favorites_only: bool = False, user: dict
     )
 
 
-def _serve_thumbnail(img_path: str, target_size: int, user: dict) -> FileResponse:
+def _serve_thumbnail(img_path: str, target_size: int, user: dict, lib: Optional[str] = "default") -> FileResponse:
     rel_clean = unquote(img_path).strip("/")
-    if not user_can_access_image(user, rel_clean):
+    db = load_db()
+    lib_id, _, _ = get_library_root(lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
-    orig_path = safe_resolve(rel_clean)
+    orig_path = safe_resolve(rel_clean, lib_id, db)
     if not is_valid_image(orig_path):
         raise HTTPException(status_code=404, detail="Image not found")
     try:
@@ -847,26 +1119,28 @@ def _serve_thumbnail(img_path: str, target_size: int, user: dict) -> FileRespons
 
 
 @app.get("/api/thumb/400/{img_path:path}")
-def get_thumbnail_400(img_path: str, user: dict = Depends(get_current_user)):
-    return _serve_thumbnail(img_path, 400, user)
+def get_thumbnail_400(img_path: str, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    return _serve_thumbnail(img_path, 400, user, lib)
 
 
 @app.get("/api/thumb/1200/{img_path:path}")
-def get_thumbnail_1200(img_path: str, user: dict = Depends(get_current_user)):
-    return _serve_thumbnail(img_path, 1200, user)
+def get_thumbnail_1200(img_path: str, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    return _serve_thumbnail(img_path, 1200, user, lib)
 
 
 @app.get("/api/thumb/{img_path:path}")
-def get_thumbnail_legacy(img_path: str, size: int = 400, user: dict = Depends(get_current_user)):
-    return _serve_thumbnail(img_path, 1200 if size >= 1000 else 400, user)
+def get_thumbnail_legacy(img_path: str, size: int = 400, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    return _serve_thumbnail(img_path, 1200 if size >= 1000 else 400, user, lib)
 
 
 @app.get("/api/original/{img_path:path}")
-def get_original(img_path: str, download: bool = False, user: dict = Depends(get_current_user)):
+def get_original(img_path: str, download: bool = False, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
     rel_clean = unquote(img_path).strip("/")
-    if not user_can_access_image(user, rel_clean):
+    db = load_db()
+    lib_id, _, _ = get_library_root(lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
-    orig_path = safe_resolve(rel_clean)
+    orig_path = safe_resolve(rel_clean, lib_id, db)
     if not is_valid_image(orig_path):
         raise HTTPException(status_code=404, detail="Image not found")
     if download:

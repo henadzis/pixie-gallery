@@ -128,11 +128,17 @@
           <span class="hidden sm:inline" data-i18n="nav_home">На главную</span>
         </button>
 
-        <button onclick="showHome()" class="inline-flex items-center gap-2.5 hover:opacity-70 transition text-left ml-1 min-w-0">
-          <img src="/pixie_gallery.svg" alt="Pixie Logo" class="w-7 h-7 object-contain shrink-0" />
-          <span id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium truncate">
-            {{ title }}
-          </span>
+        <div id="library-switcher-wrap" class="relative hidden shrink-0">
+          <button type="button" id="library-switcher-btn" onclick="toggleLibraryDropdown(event)" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs transition bg-transparent text-stone-800 dark:text-stone-200">
+            <svg id="library-chevron-icon" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </button>
+          <div id="library-dropdown-menu" class="hidden absolute left-0 mt-1.5 min-w-[200px] max-w-xs bg-white dark:bg-[#1a1a1a] border border-stone-200 dark:border-stone-800 shadow-lg py-1 z-50 text-xs"></div>
+        </div>
+
+        <button onclick="showHome()" id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium hover:opacity-70 transition text-left ml-1 truncate">
+          {{ title }}
         </button>
       </div>
 
@@ -479,6 +485,24 @@
       </div>
 
       <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_libraries">Библиотеки фотографий (папки)</h3>
+        <div id="libraries-list" class="space-y-2 text-xs"></div>
+
+        <form onsubmit="handleSaveLibrary(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="lib-form-title" data-i18n="lib_form_title">Добавить или изменить библиотеку</div>
+          <input id="edit-lib-id" type="hidden" value="" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <input id="new-lib-name" type="text" data-i18n-placeholder="lib_ph_name" placeholder="Название (напр. Семейный архив)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <input id="new-lib-path" type="text" data-i18n-placeholder="lib_ph_path" placeholder="Путь в контейнере (напр. /photos_family)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs font-mono" />
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_lib">Сохранить библиотеку</button>
+            <button type="button" id="cancel-lib-edit-btn" onclick="resetLibraryForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
         <div id="users-list" class="space-y-2 text-xs"></div>
 
@@ -491,6 +515,11 @@
               <option value="user" data-i18n="role_user">Клиент</option>
               <option value="admin" data-i18n="role_admin">Администратор</option>
             </select>
+          </div>
+
+          <div class="space-y-2">
+            <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
+            <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
           </div>
 
           <div class="space-y-2">
@@ -616,7 +645,20 @@
         confirm_del_user: 'Удалить пользователя',
         confirm_hide_album: 'Вы действительно хотите скрыть этот альбом?',
         copied_files: 'Скопировано имен файлов',
-        no_hidden: 'Нет скрытых альбомов'
+        no_hidden: 'Нет скрытых альбомов',
+        thumb_retry: 'Повторить',
+        settings_libraries: 'Библиотеки фотографий (папки)',
+        lib_form_title: 'Добавить или изменить библиотеку',
+        lib_ph_name: 'Название (напр. Семейный архив)',
+        lib_ph_path: 'Путь в контейнере (напр. /photos_family)',
+        btn_save_lib: 'Сохранить библиотеку',
+        btn_cancel: 'Отмена',
+        lib_status_ok: '✓ Доступна',
+        lib_status_missing: '✕ Путь не найден',
+        confirm_del_lib: 'Удалить библиотеку',
+        user_allowed_libs: 'Доступные библиотеки',
+        all_libs_star: 'ВСЕ БИБЛИОТЕКИ (*)',
+        switch_library_title: 'Выбрать библиотеку'
       },
       en: {
         login_subtitle: 'Client Gallery Login',
@@ -719,7 +761,20 @@
         confirm_del_user: 'Delete user',
         confirm_hide_album: 'Are you sure you want to hide this album?',
         copied_files: 'Copied filenames',
-        no_hidden: 'No hidden albums'
+        no_hidden: 'No hidden albums',
+        thumb_retry: 'Retry',
+        settings_libraries: 'Photo Libraries (Folders)',
+        lib_form_title: 'Add or Edit Library',
+        lib_ph_name: 'Name (e.g. Family Archive)',
+        lib_ph_path: 'Container Path (e.g. /photos_family)',
+        btn_save_lib: 'Save Library',
+        btn_cancel: 'Cancel',
+        lib_status_ok: '✓ Available',
+        lib_status_missing: '✕ Path not found',
+        confirm_del_lib: 'Delete library',
+        user_allowed_libs: 'Allowed Libraries',
+        all_libs_star: 'ALL LIBRARIES (*)',
+        switch_library_title: 'Select Library'
       }
     };
 
@@ -735,7 +790,11 @@
     let currentLang = localStorage.getItem('pixie_lang') || 'ru';
     let currentUser = null;
     let appSettings = { gallery_title: 'PHOTO ARCHIVE', show_exif: true, allow_zip_download: true, exclude_extensions: '', exclude_masks: '', hidden_folders: '', show_hidden_albums: false };
+    let availableLibraries = [];
+    let adminLibraries = [];
+    let currentLibraryId = localStorage.getItem('pixie_library') || 'default';
     let allYears = [];
+    let siblingAlbumsCatalog = [];
     let allAlbumsCatalog = [];
     let currentAlbumPath = '';
     let currentAlbumPathEncoded = '';
@@ -778,6 +837,7 @@
         el.placeholder = t(key);
       });
       updateRatioButtonLabel();
+      renderLibrarySwitcher();
       if (allYears.length) {
         renderSidebarTree(currentAlbumPath);
         renderYears('ALL');
@@ -953,12 +1013,75 @@
       window.location.reload();
     }
 
+    function toggleLibraryDropdown(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('library-dropdown-menu');
+      if (menu) menu.classList.toggle('hidden');
+    }
+
+    function closeLibraryDropdown() {
+      const menu = document.getElementById('library-dropdown-menu');
+      if (menu) menu.classList.add('hidden');
+    }
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('library-switcher-wrap');
+      if (wrap && !wrap.contains(e.target)) {
+        closeLibraryDropdown();
+      }
+    });
+
+    function renderLibrarySwitcher() {
+      const wrap = document.getElementById('library-switcher-wrap');
+      const btn = document.getElementById('library-switcher-btn');
+      const menu = document.getElementById('library-dropdown-menu');
+      if (!wrap || !btn || !menu) return;
+
+      if (!availableLibraries || availableLibraries.length <= 1) {
+        wrap.classList.add('hidden');
+        return;
+      }
+
+      wrap.classList.remove('hidden');
+      const activeLib = availableLibraries.find(l => l.id === currentLibraryId) || availableLibraries[0];
+      btn.title = `${t('lib_switch_title')}: ${activeLib ? activeLib.name : ''}`;
+
+      menu.innerHTML = availableLibraries.map(lib => {
+        const isActive = lib.id === currentLibraryId;
+        const safeId = lib.id.replace(/'/g, "\\'");
+        return `
+          <button type="button" onclick="switchLibrary('${safeId}')" class="w-full text-left px-3 py-2 text-xs tracking-wider uppercase flex items-center justify-between transition ${isActive ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium' : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626]'}">
+            <span class="truncate pr-2">${lib.name}</span>
+            ${isActive ? '<span>✓</span>' : ''}
+          </button>
+        `;
+      }).join('');
+    }
+
+    async function switchLibrary(libId) {
+      closeLibraryDropdown();
+      if (libId === currentLibraryId && currentAlbumPath === '') return;
+      currentLibraryId = libId;
+      localStorage.setItem('pixie_library', libId);
+      currentAlbumPath = '';
+      currentAlbumYear = '';
+      await loadStructure();
+      showHomeView(true, true);
+    }
+
     async function loadStructure() {
-      const res = await fetch('/api/structure');
+      const res = await fetch(`/api/structure?lib=${encodeURIComponent(currentLibraryId)}`);
       if (!res.ok) return;
       const data = await res.json();
+      availableLibraries = data.libraries || [];
+      if (data.active_library && data.active_library.id) {
+        currentLibraryId = data.active_library.id;
+        localStorage.setItem('pixie_library', currentLibraryId);
+      }
       allYears = data.years || [];
+      siblingAlbumsCatalog = data.sibling_catalog || [];
       allAlbumsCatalog = data.all_albums_catalog || [];
+      renderLibrarySwitcher();
       renderSidebarTree(currentAlbumPath);
       renderYears('ALL');
       // Re-apply search if it was active
@@ -1112,8 +1235,9 @@
 
     async function hideCurrentAlbum() {
       let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
-      if (!hiddenList.includes(currentAlbumPath)) {
-        hiddenList.push(currentAlbumPath);
+      const folderKey = currentLibraryId === 'default' ? currentAlbumPath : `${currentLibraryId}::${currentAlbumPath}`;
+      if (!hiddenList.includes(folderKey)) {
+        hiddenList.push(folderKey);
         appSettings.hidden_folders = hiddenList.join('|');
         
         await fetch('/api/settings', {
@@ -1134,22 +1258,23 @@
     function renderSiblingNav() {
       const prevBtn = document.getElementById('nav-prev-btn');
       const nextBtn = document.getElementById('nav-next-btn');
-      if (!allAlbumsCatalog || allAlbumsCatalog.length === 0) return;
+      const catalog = (siblingAlbumsCatalog && siblingAlbumsCatalog.length > 0) ? siblingAlbumsCatalog : allAlbumsCatalog;
+      if (!catalog || catalog.length === 0) return;
 
-      const idx = allAlbumsCatalog.findIndex(a => a.path === currentAlbumPath);
+      const idx = catalog.findIndex(a => a.path === currentAlbumPath);
       
       if (idx > 0) {
         prevBtn.classList.remove('hidden');
-        document.getElementById('nav-prev-name').textContent = allAlbumsCatalog[idx-1].name || allAlbumsCatalog[idx-1].path.split('/').pop();
-        prevBtn.onclick = () => { openAlbum(encodeURIComponent(allAlbumsCatalog[idx-1].path)); };
+        document.getElementById('nav-prev-name').textContent = catalog[idx-1].name || catalog[idx-1].path.split('/').pop();
+        prevBtn.onclick = () => { openAlbum(encodeURIComponent(catalog[idx-1].path)); };
       } else {
         prevBtn.classList.add('hidden');
       }
 
-      if (idx !== -1 && idx < allAlbumsCatalog.length - 1) {
+      if (idx !== -1 && idx < catalog.length - 1) {
         nextBtn.classList.remove('hidden');
-        document.getElementById('nav-next-name').textContent = allAlbumsCatalog[idx+1].name || allAlbumsCatalog[idx+1].path.split('/').pop();
-        nextBtn.onclick = () => { openAlbum(encodeURIComponent(allAlbumsCatalog[idx+1].path)); };
+        document.getElementById('nav-next-name').textContent = catalog[idx+1].name || catalog[idx+1].path.split('/').pop();
+        nextBtn.onclick = () => { openAlbum(encodeURIComponent(catalog[idx+1].path)); };
       } else {
         nextBtn.classList.add('hidden');
       }
@@ -1168,7 +1293,8 @@
         setHashSilently(`#album/${currentAlbumPathEncoded}`);
       }
 
-      const res = await fetch(`/api/album/${currentAlbumPathEncoded}`);
+      const libQuery = `lib=${encodeURIComponent(currentLibraryId)}`;
+      const res = await fetch(`/api/album/${currentAlbumPathEncoded}?${libQuery}`);
       if (!res.ok) return;
       const album = await res.json();
       currentPhotos = album.photos || [];
@@ -1181,7 +1307,7 @@
 
       const zipBtn = document.getElementById('album-zip-btn');
       if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
-        zipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}`;
+        zipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}?${libQuery}`;
         zipBtn.classList.remove('hidden');
       } else {
         zipBtn.classList.add('hidden');
@@ -1260,6 +1386,83 @@
       return copy;
     }
 
+    let thumbObserver = null;
+
+    function initThumbObserver() {
+      if (thumbObserver) {
+        thumbObserver.disconnect();
+      }
+      if (!('IntersectionObserver' in window)) return;
+      thumbObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            const img = entry.target;
+            if (img.complete && img.naturalWidth === 0) {
+              const base = img.dataset.src;
+              if (base) {
+                const sep = base.includes('?') ? '&' : '?';
+                img.src = `${base}${sep}_retry=${Date.now()}`;
+              }
+            }
+          }
+        });
+      }, { rootMargin: '250px' });
+    }
+
+    function onThumbLoaded(img, isCrop) {
+      const container = img.closest('.group');
+      if (container) {
+        const overlay = container.querySelector('.thumb-retry-overlay');
+        if (overlay) overlay.classList.add('hidden');
+        if (!isCrop && img.naturalWidth && img.naturalHeight) {
+          container.style.flexGrow = img.naturalWidth / img.naturalHeight;
+          container.style.flexBasis = (img.naturalWidth / img.naturalHeight * container.clientHeight) + 'px';
+        }
+      }
+    }
+
+    function onThumbError(img) {
+      const retries = parseInt(img.dataset.retries || '0', 10);
+      const container = img.closest('.group');
+      if (retries < 3) {
+        img.dataset.retries = (retries + 1).toString();
+        const delay = (retries + 1) * 1500;
+        setTimeout(() => {
+          if (!img.isConnected) return;
+          const base = img.dataset.src;
+          if (base) {
+            const sep = base.includes('?') ? '&' : '?';
+            img.src = `${base}${sep}_retry=${Date.now()}`;
+          }
+        }, delay);
+      } else {
+        if (container) {
+          const overlay = container.querySelector('.thumb-retry-overlay');
+          if (overlay) overlay.classList.remove('hidden');
+        }
+      }
+    }
+
+    function retryThumbManual(event, idx) {
+      if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+      }
+      const img = document.querySelector(`img[data-idx="${idx}"]`);
+      if (!img) return;
+      img.dataset.retries = '0';
+      const container = img.closest('.group');
+      if (container) {
+        const overlay = container.querySelector('.thumb-retry-overlay');
+        if (overlay) overlay.classList.add('hidden');
+      }
+      const base = img.dataset.src;
+      if (base) {
+        const sep = base.includes('?') ? '&' : '?';
+        img.src = `${base}${sep}_retry=${Date.now()}`;
+      }
+    }
+
     function renderAlbumPhotos() {
       const favPhotos = currentPhotos.filter(p => p.is_favorite);
       document.getElementById('fav-counter-badge').textContent = favPhotos.length;
@@ -1282,7 +1485,7 @@
       if (favPhotos.length > 0) {
         favActionsBar.classList.remove('hidden');
         if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
-          favZipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}?favorites_only=true`;
+          favZipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}?favorites_only=true&lib=${encodeURIComponent(currentLibraryId)}`;
           favZipBtn.classList.remove('hidden');
         } else {
           favZipBtn.classList.add('hidden');
@@ -1308,15 +1511,31 @@
 
       grid.innerHTML = displayedPhotos.map((p, idx) => `
         <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
-          <img src="${p.thumb}" loading="lazy" alt="${p.name}" 
-               onload="if(!${isCrop}) { this.parentElement.style.flexGrow = this.naturalWidth / this.naturalHeight; this.parentElement.style.flexBasis = (this.naturalWidth / this.naturalHeight * this.parentElement.clientHeight) + 'px'; }"
+          <img src="${p.thumb}" loading="lazy" alt="${p.name}" data-idx="${idx}" data-src="${p.thumb}"
+               onload="onThumbLoaded(this, ${isCrop})"
+               onerror="onThumbError(this)"
                onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:scale-105 transition-transform duration-700 ease-out" />
+          <div class="thumb-retry-overlay absolute inset-0 hidden flex flex-col items-center justify-center bg-stone-100/95 dark:bg-stone-900/95 text-stone-500 z-10 text-center pointer-events-auto p-2">
+            <button type="button" onclick="retryThumbManual(event, ${idx})" class="p-2.5 rounded-full border border-stone-300 dark:border-stone-700 bg-white/80 dark:bg-black/60 hover:border-stone-800 dark:hover:border-stone-300 text-stone-700 dark:text-stone-300 transition shadow-sm" title="${t('thumb_retry')}">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+            <span class="text-[10px] mt-1.5 uppercase tracking-wider text-stone-400 font-medium">${t('thumb_retry')}</span>
+          </div>
           <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
           <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
             ${p.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline}
           </button>
         </div>
       `).join('');
+
+      initThumbObserver();
+      document.querySelectorAll('#photos-grid img[data-src]').forEach(img => {
+        if (thumbObserver) thumbObserver.observe(img);
+      });
     }
 
     async function toggleFavoriteByPath(event, encodedPhotoPath) {
@@ -1325,7 +1544,7 @@
       const res = await fetch('/api/favorites/toggle', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ photo_path: decodedPath })
+        body: JSON.stringify({ photo_path: decodedPath, lib: currentLibraryId })
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -1445,7 +1664,8 @@
         preloadNeighbors(currentIndex);
       }
 
-      document.getElementById('lb-download').href = `${item.original}?download=true`;
+      const dlSep = item.original.includes('?') ? '&' : '?';
+      document.getElementById('lb-download').href = `${item.original}${dlSep}download=true`;
       document.getElementById('lb-counter').textContent = `${currentIndex + 1} / ${displayedPhotos.length}`;
       document.getElementById('lb-filename').textContent = item.name;
 
@@ -1627,11 +1847,114 @@
       document.getElementById('filter-saved-msg').classList.add('hidden');
       document.getElementById('title-saved-msg').classList.add('hidden');
       
+      await loadLibrariesAdmin();
       renderAlbumCheckboxes();
       renderHiddenAlbumsCheckboxes();
       await loadUsersList();
       await pollPregenStatus();
       document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    async function loadLibrariesAdmin() {
+      const res = await fetch('/api/libraries');
+      if (!res.ok) return;
+      const data = await res.json();
+      adminLibraries = data.libraries || [];
+      renderLibrariesAdminList();
+      renderLibraryCheckboxes(['*']);
+    }
+
+    function renderLibrariesAdminList() {
+      const listEl = document.getElementById('libraries-list');
+      if (!listEl) return;
+      const canDelete = adminLibraries.length > 1;
+      listEl.innerHTML = adminLibraries.map(lib => {
+        const safeId = lib.id.replace(/'/g, "\\'");
+        const safeName = lib.name.replace(/'/g, "\\'");
+        const safePath = lib.path.replace(/'/g, "\\'");
+        const statusBadge = lib.exists
+          ? `<span class="text-[10px] uppercase bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-1.5 py-0.5 rounded-sm">${t('lib_status_ok')}</span>`
+          : `<span class="text-[10px] uppercase bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 px-1.5 py-0.5 rounded-sm">${t('lib_status_missing')}</span>`;
+        return `
+          <div class="flex items-center justify-between bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 px-3 py-2 gap-2">
+            <div class="flex items-center flex-wrap gap-2 min-w-0">
+              <span class="font-semibold text-xs truncate">${lib.name}</span>
+              <span class="text-xs font-mono text-stone-500 dark:text-stone-400 bg-stone-200/70 dark:bg-stone-800 px-1.5 py-0.5 truncate">${lib.path}</span>
+              ${statusBadge}
+            </div>
+            <div class="flex items-center space-x-3 shrink-0">
+              <button type="button" onclick="editLibraryPrompt('${safeId}', '${safeName}', '${safePath}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
+              ${canDelete ? `<button type="button" onclick="deleteLibrary('${safeId}', '${safeName}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function editLibraryPrompt(id, name, path) {
+      document.getElementById('edit-lib-id').value = id;
+      document.getElementById('edit-lib-name').value = name;
+      document.getElementById('edit-lib-path').value = path;
+      document.getElementById('btn-cancel-lib-edit').classList.remove('hidden');
+    }
+
+    function resetLibraryForm() {
+      document.getElementById('edit-lib-id').value = '';
+      document.getElementById('edit-lib-name').value = '';
+      document.getElementById('edit-lib-path').value = '';
+      document.getElementById('btn-cancel-lib-edit').classList.add('hidden');
+    }
+
+    async function handleSaveLibrary(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-lib-id').value.trim() || null;
+      const name = document.getElementById('edit-lib-name').value.trim();
+      const path = document.getElementById('edit-lib-path').value.trim();
+      if (!name || !path) return;
+
+      const res = await fetch('/api/libraries', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name, path })
+      });
+      if (res.ok) {
+        resetLibraryForm();
+        await loadLibrariesAdmin();
+        await loadStructure();
+        renderAlbumCheckboxes();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error');
+      }
+    }
+
+    async function deleteLibrary(id, name) {
+      if (!confirm(`${t('confirm_del_lib')} "${name}"?`)) return;
+      const res = await fetch(`/api/libraries/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (res.ok) {
+        if (currentLibraryId === id) {
+          currentLibraryId = 'default';
+          localStorage.setItem('pixie_library', 'default');
+        }
+        await loadLibrariesAdmin();
+        await loadStructure();
+        renderAlbumCheckboxes();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Error');
+      }
+    }
+
+    function renderLibraryCheckboxes(selectedLibs = ['*']) {
+      const box = document.getElementById('libraries-checkbox-list');
+      if (!box) return;
+      const isAll = selectedLibs.includes('*');
+      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAll ? 'checked' : ''} class="lib-cb accent-stone-900 dark:accent-stone-100" /><span>★ ${t('all_libs_star')}</span></label>`;
+      for (const lib of adminLibraries) {
+        const isChecked = isAll || selectedLibs.includes(lib.id);
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${lib.id}" ${isChecked ? 'checked' : ''} class="lib-cb accent-stone-900 dark:accent-stone-100" /><span class="truncate" title="${lib.path}">${lib.name}</span></label>`;
+      }
+      box.innerHTML = html;
     }
 
     function closeSettingsModal() {
@@ -1749,10 +2072,12 @@
       document.querySelector(`input[name="access-mode"][value="${mode}"]`).checked = true;
       currentUserEditMode = mode;
 
+      const multiLibs = adminLibraries && adminLibraries.length > 1;
       let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
       for (const a of allAlbumsCatalog) {
         const isChecked = selectedAlbums.includes('*') || selectedAlbums.includes(a.path);
-        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${a.name || a.path}</span></label>`;
+        const displayName = (multiLibs && a.lib_name) ? `[${a.lib_name}] ${a.name || a.path}` : (a.name || a.path);
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${displayName}</span></label>`;
       }
       box.innerHTML = html;
     }
@@ -1771,18 +2096,20 @@
             <span class="text-[11px] text-red-600 inline-flex items-center gap-0.5 ml-1">${SVG_ICONS.heartActive} ${u.favorites_count || 0}</span>
           </div>
           <div class="flex items-center space-x-3">
-            <button onclick="editUserPrompt('${u.username}', '${u.role}', '${u.mode || 'allow'}', '${encodeURIComponent(JSON.stringify(u.allowed_albums))}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
+            <button onclick="editUserPrompt('${u.username}', '${u.role}', '${u.mode || 'allow'}', '${encodeURIComponent(JSON.stringify(u.allowed_albums || []))}', '${encodeURIComponent(JSON.stringify(u.allowed_libraries || ['*']))}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
             ${u.username !== currentUser.username ? `<button onclick="deleteUser('${u.username}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
           </div>
         </div>
       `).join('');
     }
 
-    function editUserPrompt(username, role, mode, encAlbums) {
+    function editUserPrompt(username, role, mode, encAlbums, encLibs) {
       document.getElementById('new-u-name').value = username;
       document.getElementById('new-u-pass').value = '';
       document.getElementById('new-u-role').value = role;
       const albums = JSON.parse(decodeURIComponent(encAlbums));
+      const libs = encLibs ? JSON.parse(decodeURIComponent(encLibs)) : ['*'];
+      renderLibraryCheckboxes(libs);
       renderAlbumCheckboxes(albums, mode);
     }
 
@@ -1793,15 +2120,25 @@
       const role = document.getElementById('new-u-role').value;
       const mode = currentUserEditMode;
       const checked = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
+      const checkedLibs = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
+      const allowedLibraries = (role === 'admin' || checkedLibs.includes('*') || checkedLibs.length === 0) ? ['*'] : checkedLibs;
 
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password: password || null, role, mode, allowed_albums: role === 'admin' ? ['*'] : checked })
+        body: JSON.stringify({
+          username,
+          password: password || null,
+          role,
+          mode,
+          allowed_albums: role === 'admin' ? ['*'] : checked,
+          allowed_libraries: allowedLibraries
+        })
       });
       if (res.ok) {
         document.getElementById('new-u-name').value = '';
         document.getElementById('new-u-pass').value = '';
+        renderLibraryCheckboxes(['*']);
         renderAlbumCheckboxes([], 'allow');
         await loadUsersList();
       } else {
