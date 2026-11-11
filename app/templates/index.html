@@ -522,6 +522,13 @@
             <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
           </div>
 
+          <div class="space-y-1">
+            <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
+            <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
+            </select>
+          </div>
+
           <div class="space-y-2">
             <div class="flex items-center space-x-4 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
               <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
@@ -658,7 +665,10 @@
         confirm_del_lib: 'Удалить библиотеку',
         user_allowed_libs: 'Доступные библиотеки',
         all_libs_star: 'ВСЕ БИБЛИОТЕКИ (*)',
-        switch_library_title: 'Выбрать библиотеку'
+        switch_library_title: 'Выбрать библиотеку',
+        user_default_lib: 'Библиотека по умолчанию',
+        lib_default_auto: 'Автоматически (первая доступная)',
+        badge_default_lib: 'по умолч.'
       },
       en: {
         login_subtitle: 'Client Gallery Login',
@@ -774,7 +784,10 @@
         confirm_del_lib: 'Delete library',
         user_allowed_libs: 'Allowed Libraries',
         all_libs_star: 'ALL LIBRARIES (*)',
-        switch_library_title: 'Select Library'
+        switch_library_title: 'Select Library',
+        user_default_lib: 'Default Library',
+        lib_default_auto: 'Auto (first available)',
+        badge_default_lib: 'default'
       }
     };
 
@@ -984,6 +997,12 @@
       if (currentUser.role === 'admin') {
         document.getElementById('settings-btn').classList.remove('hidden');
       }
+      if (currentUser && currentUser.default_library) {
+        const storedLib = localStorage.getItem('pixie_library');
+        if (!storedLib) {
+          currentLibraryId = currentUser.default_library;
+        }
+      }
       await loadStructure();
       handleHashNavigation();
     }
@@ -1004,10 +1023,12 @@
         errEl.classList.remove('hidden');
         return;
       }
+      localStorage.removeItem('pixie_library');
       await initApp();
     }
 
     async function handleLogout() {
+      localStorage.removeItem('pixie_library');
       await fetch('/api/logout', { method: 'POST' });
       window.location.hash = '';
       window.location.reload();
@@ -1950,7 +1971,7 @@
       }
     }
 
-    function renderLibraryCheckboxes(selectedLibs = ['*']) {
+    function renderLibraryCheckboxes(selectedLibs = ['*'], selectedDefaultLib = '') {
       const box = document.getElementById('libraries-checkbox-list');
       if (!box) return;
       const isAll = selectedLibs.includes('*');
@@ -1960,6 +1981,16 @@
         html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${lib.id}" ${isChecked ? 'checked' : ''} class="lib-cb accent-stone-900 dark:accent-stone-100" /><span class="truncate" title="${lib.path}">${lib.name}</span></label>`;
       }
       box.innerHTML = html;
+
+      const defSelect = document.getElementById('new-u-default-lib');
+      if (defSelect) {
+        let optHtml = `<option value="" ${!selectedDefaultLib ? 'selected' : ''}>${t('lib_default_auto')}</option>`;
+        for (const lib of adminLibraries) {
+          const isSel = selectedDefaultLib === lib.id ? 'selected' : '';
+          optHtml += `<option value="${lib.id}" ${isSel}>${lib.name}</option>`;
+        }
+        defSelect.innerHTML = optHtml;
+      }
     }
 
     function closeSettingsModal() {
@@ -2092,29 +2123,43 @@
       if (!res.ok) return;
       const data = await res.json();
       const listEl = document.getElementById('users-list');
-      listEl.innerHTML = data.users.map(u => `
+      listEl.innerHTML = data.users.map(u => {
+        const defLibName = u.default_library
+          ? (adminLibraries.find(l => l.id === u.default_library)?.name || u.default_library)
+          : null;
+        const defBadge = defLibName
+          ? `<span class="text-[10px] bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 px-1.5 py-0.5 rounded-sm" title="${t('user_default_lib')}: ${defLibName}">${t('badge_default_lib')}: ${defLibName}</span>`
+          : '';
+        const safeUname = u.username.replace(/'/g, "\\'");
+        const safeRole = (u.role || '').replace(/'/g, "\\'");
+        const safeMode = (u.mode || 'allow').replace(/'/g, "\\'");
+        const safeDefLib = (u.default_library || '').replace(/'/g, "\\'");
+
+        return `
         <div class="flex items-center justify-between bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 px-3 py-2">
           <div class="flex items-center flex-wrap gap-1.5">
             <span class="font-semibold">${u.username}</span>
             <span class="text-[10px] uppercase bg-stone-200 dark:bg-stone-700 px-1.5 py-0.5">${u.role}</span>
             <span class="text-[10px] uppercase bg-stone-300 dark:bg-stone-600 px-1.5 py-0.5">${u.mode === 'deny' ? t('mode_badge_deny') : t('mode_badge_allow')}</span>
+            ${defBadge}
             <span class="text-[11px] text-red-600 inline-flex items-center gap-0.5 ml-1">${SVG_ICONS.heartActive} ${u.favorites_count || 0}</span>
           </div>
           <div class="flex items-center space-x-3">
-            <button onclick="editUserPrompt('${u.username}', '${u.role}', '${u.mode || 'allow'}', '${encodeURIComponent(JSON.stringify(u.allowed_albums || []))}', '${encodeURIComponent(JSON.stringify(u.allowed_libraries || ['*']))}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
-            ${u.username !== currentUser.username ? `<button onclick="deleteUser('${u.username}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
+            <button onclick="editUserPrompt('${safeUname}', '${safeRole}', '${safeMode}', '${encodeURIComponent(JSON.stringify(u.allowed_albums || []))}', '${encodeURIComponent(JSON.stringify(u.allowed_libraries || ['*']))}', '${safeDefLib}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
+            ${u.username !== currentUser.username ? `<button onclick="deleteUser('${safeUname}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
           </div>
         </div>
-      `).join('');
+        `;
+      }).join('');
     }
 
-    function editUserPrompt(username, role, mode, encAlbums, encLibs) {
+    function editUserPrompt(username, role, mode, encAlbums, encLibs, defLib = '') {
       document.getElementById('new-u-name').value = username;
       document.getElementById('new-u-pass').value = '';
       document.getElementById('new-u-role').value = role;
       const albums = JSON.parse(decodeURIComponent(encAlbums));
       const libs = encLibs ? JSON.parse(decodeURIComponent(encLibs)) : ['*'];
-      renderLibraryCheckboxes(libs);
+      renderLibraryCheckboxes(libs, defLib);
       renderAlbumCheckboxes(albums, mode);
     }
 
@@ -2127,6 +2172,7 @@
       const checked = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
       const checkedLibs = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
       const allowedLibraries = (role === 'admin' || checkedLibs.includes('*') || checkedLibs.length === 0) ? ['*'] : checkedLibs;
+      const defLib = document.getElementById('new-u-default-lib')?.value || null;
 
       const res = await fetch('/api/users', {
         method: 'POST',
@@ -2137,13 +2183,14 @@
           role,
           mode,
           allowed_albums: role === 'admin' ? ['*'] : checked,
-          allowed_libraries: allowedLibraries
+          allowed_libraries: allowedLibraries,
+          default_library: defLib || null
         })
       });
       if (res.ok) {
         document.getElementById('new-u-name').value = '';
         document.getElementById('new-u-pass').value = '';
-        renderLibraryCheckboxes(['*']);
+        renderLibraryCheckboxes(['*'], '');
         renderAlbumCheckboxes([], 'allow');
         await loadUsersList();
       } else {

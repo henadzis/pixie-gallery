@@ -271,7 +271,8 @@ def get_current_user(pixie_token: Optional[str] = Cookie(default=None)) -> dict:
             "role": user_obj.get("role", "user"),
             "mode": user_obj.get("mode", "allow"),
             "allowed_albums": user_obj.get("allowed_albums", []),
-            "allowed_libraries": user_obj.get("allowed_libraries", ["*"])
+            "allowed_libraries": user_obj.get("allowed_libraries", ["*"]),
+            "default_library": user_obj.get("default_library")
         }
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -481,6 +482,7 @@ class UserUpsertRequest(BaseModel):
     mode: str = "allow"
     allowed_albums: List[str] = []
     allowed_libraries: List[str] = ["*"]
+    default_library: Optional[str] = None
 
 
 class FavoriteToggleRequest(BaseModel):
@@ -672,6 +674,7 @@ def list_users(user: dict = Depends(get_current_user)):
             "mode": udata.get("mode", "allow"),
             "allowed_albums": udata.get("allowed_albums", []),
             "allowed_libraries": udata.get("allowed_libraries", ["*"]),
+            "default_library": udata.get("default_library"),
             "favorites_count": fav_count
         })
     return {"users": result}
@@ -690,12 +693,14 @@ def save_user(req: UserUpsertRequest, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Password required for new user")
 
     pw_hash = existing["password"] if (existing and not req.password) else hashlib.sha256(req.password.encode()).hexdigest()
+    def_lib = (req.default_library or "").strip()
     db["users"][uname] = {
         "password": pw_hash,
         "role": req.role,
         "mode": req.mode,
         "allowed_albums": req.allowed_albums,
-        "allowed_libraries": req.allowed_libraries if req.allowed_libraries else ["*"]
+        "allowed_libraries": req.allowed_libraries if req.allowed_libraries else ["*"],
+        "default_library": def_lib if def_lib and def_lib != "auto" else None
     }
     save_db(db)
     return {"status": "ok"}
@@ -931,7 +936,13 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
         }
 
     requested_id = (lib or "").strip()
-    active_lib = next((l for l in accessible_libs if l["id"] == requested_id), accessible_libs[0])
+    active_lib = next((l for l in accessible_libs if l["id"] == requested_id), None)
+    if not active_lib:
+        user_def_lib = user.get("default_library")
+        if user_def_lib:
+            active_lib = next((l for l in accessible_libs if l["id"] == user_def_lib), None)
+    if not active_lib:
+        active_lib = accessible_libs[0]
     active_id = active_lib["id"]
     _, active_root, _ = get_library_root(active_id, db)
 
