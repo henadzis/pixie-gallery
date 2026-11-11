@@ -34,6 +34,15 @@ if [ -z "$(ls -A test_photos/2026/Sample_Album 2>/dev/null)" ]; then
     fi
 fi
 
+if command -v ffmpeg >/dev/null 2>&1; then
+    if [ ! -f "test_photos/2026/Sample_Album/sample_video_1.mp4" ]; then
+        ffmpeg -y -f lavfi -i testsrc=duration=6:size=640x360:rate=30 -f lavfi -i sine=frequency=1000:duration=6 -c:v libx264 -pix_fmt yuv420p -c:a aac -movflags +faststart test_photos/2026/Sample_Album/sample_video_1.mp4 >/dev/null 2>&1 || true
+        echo "Создано тестовое видео sample_video_1.mp4"
+    fi
+else
+    echo "Примечание: системный ffmpeg не найден. Рекомендуется установить (например, brew install ffmpeg или apt install ffmpeg)."
+fi
+
 echo ""
 echo "Настройка завершена! Для запуска выполните:"
 echo "  ./run_local.sh"

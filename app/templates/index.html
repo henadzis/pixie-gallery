@@ -4,6 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{ title }}</title>
+
+  <!-- PWA & Mobile Web App (iPad / iOS / Android) -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="{{ title }}" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#faf9f6" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#121212" media="(prefers-color-scheme: dark)" />
+  <link rel="manifest" href="/manifest.json" />
+
   <link rel="icon" type="image/svg+xml" href="/pixie_gallery.svg" />
   <link rel="alternate icon" href="/favicon.ico" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/pixie_gallery.svg" />
@@ -76,7 +86,7 @@
     }
   </style>
 </head>
-<body id="body-tag" class="font-montserrat h-screen flex flex-col overflow-hidden bg-[#faf9f6] text-[#1c1c1c] dark:bg-[#121212] dark:text-[#e0e0e0] transition-colors duration-300 selection:bg-stone-300 dark:selection:bg-stone-700">
+<body id="body-tag" class="font-montserrat h-screen flex flex-col overflow-hidden bg-[#f0eee9] text-[#1c1c1c] dark:bg-[#0a0a0a] dark:text-[#e0e0e0] transition-colors duration-300 selection:bg-stone-300 dark:selection:bg-stone-700">
 
   <!-- АВТОРИЗАЦИЯ -->
   <div id="login-screen" class="fixed inset-0 z-50 hidden bg-[#faf9f6] dark:bg-[#121212] flex items-center justify-center p-6">
@@ -107,6 +117,9 @@
       </form>
     </div>
   </div>
+
+  <!-- ГЛАВНЫЙ КОНТЕЙНЕР ПРИЛОЖЕНИЯ (BOXED 1920PX) -->
+  <div id="app-root" class="w-full max-w-[1920px] mx-auto h-screen flex flex-col overflow-hidden bg-[#faf9f6] dark:bg-[#121212] border-x border-stone-200/80 dark:border-stone-800/80 shadow-2xl relative">
 
   <!-- ШАПКА -->
   <header class="flex-none z-30 bg-[#faf9f6]/90 dark:bg-[#121212]/90 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
@@ -142,7 +155,14 @@
         </button>
       </div>
 
-      <div class="flex items-center space-x-3 md:space-x-4 text-xs tracking-[0.12em] uppercase shrink-0">
+      <div class="flex items-center space-x-2 md:space-x-3 text-xs tracking-[0.12em] uppercase shrink-0">
+        <!-- Глобальный переключатель медиа для активной библиотеки -->
+        <div id="media-filter-btn-group" class="inline-flex items-center border border-stone-300 dark:border-stone-700 p-0.5 text-[11px] tracking-wider shrink-0">
+          <button type="button" onclick="setMediaTypeFilter('all')" id="btn-media-all" class="px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition" data-i18n="filter_all">Все</button>
+          <button type="button" onclick="setMediaTypeFilter('photo')" id="btn-media-photo" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_photos">Фото</button>
+          <button type="button" onclick="setMediaTypeFilter('video')" id="btn-media-video" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_videos">Видео</button>
+        </div>
+
         <button onclick="toggleGridRatio()" id="ratio-toggle-btn" class="hidden lg:inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Grid Aspect Ratio">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7"></rect>
@@ -210,7 +230,7 @@
     <main id="main-scroll-area" class="flex-grow min-w-0 overflow-y-auto h-full scroll-smooth">
 
       <!-- ГЛАВНЫЙ ЭКРАН -->
-      <div id="home-view" class="max-w-7xl w-full mx-auto px-6 py-12">
+      <div id="home-view" class="w-full max-w-[1600px] mx-auto px-4 md:px-10 py-12">
         <div class="mb-10">
           <h2 class="serif-title text-3xl md:text-5xl tracking-widest mb-2" data-i18n="home_title">Хроника архива</h2>
           <p class="text-xs tracking-[0.2em] uppercase text-stone-400" data-i18n="home_subtitle">Все альбомы и подпапки вашего архива</p>
@@ -296,6 +316,8 @@
     </main>
   </div>
 
+  </div><!-- /#app-root -->
+
   <!-- LIGHTBOX -->
   <div id="lightbox" class="fixed inset-0 z-50 hidden bg-white/95 dark:bg-[#121212]/95 backdrop-blur-md flex flex-col justify-between p-4 md:p-6 select-none">
     <div class="flex flex-wrap justify-between items-center gap-2 text-stone-600 dark:text-stone-300 text-xs tracking-[0.14em] uppercase z-20">
@@ -342,6 +364,24 @@
       </button>
 
       <img id="lb-image" src="" alt="" draggable="false" class="max-h-[78vh] max-w-[88vw] object-contain shadow-sm cursor-zoom-in" />
+      <video id="lb-video" controls playsinline class="max-h-[78vh] max-w-[88vw] object-contain shadow-sm hidden"></video>
+
+      <div id="lb-transcode-wrap" class="hidden flex flex-col items-center justify-center p-6 bg-stone-100 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-lg max-w-md text-center space-y-4">
+        <div class="w-12 h-12 rounded-full bg-stone-200 dark:bg-stone-800 flex items-center justify-center text-stone-500">
+          <svg class="w-6 h-6 fill-current ml-0.5" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        </div>
+        <div class="text-xs uppercase tracking-wider text-stone-700 dark:text-stone-200 font-semibold" id="lb-transcode-title" data-i18n="video_transcode_title">Формат требует перекодирования</div>
+        <p class="text-[11px] text-stone-500 leading-relaxed" id="lb-transcode-desc" data-i18n="video_transcode_desc">Этот файл в контейнере MKV/AVI. Нажмите кнопку ниже, чтобы перекодировать ролик в кэш (1080p Web-Ready) для плавного воспроизведения.</p>
+        <button type="button" id="lb-btn-start-transcode" onclick="startCurrentTranscode()" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white text-white dark:text-stone-900 px-5 py-2.5 text-xs uppercase tracking-widest transition flex items-center gap-2 shadow-sm">
+          <span id="lb-transcode-btn-text" data-i18n="video_transcode_btn">Перекодировать для просмотра</span>
+        </button>
+        <div id="lb-transcode-progress" class="hidden w-full space-y-2">
+          <div class="w-full bg-stone-200 dark:bg-stone-800 h-1.5 rounded-full overflow-hidden">
+            <div id="lb-transcode-bar" class="bg-stone-800 dark:bg-stone-200 h-full w-1/3 animate-pulse"></div>
+          </div>
+          <span class="text-[10px] text-stone-400 block" id="lb-transcode-pct" data-i18n="video_transcoding">Обработка через FFmpeg...</span>
+        </div>
+      </div>
 
       <button onclick="stepPhoto(1)" class="absolute right-2 md:right-6 p-3 text-stone-400 hover:text-black dark:hover:text-white transition z-20 bg-white/60 dark:bg-black/40 rounded-full">
         <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="9 18 15 12 9 6"/></svg>
@@ -578,6 +618,15 @@
         no_albums: 'Нет доступных альбомов',
         folders_count: 'папок',
         photos_count: 'фото',
+        videos_count: 'видео',
+        media_count: 'файлов',
+        filter_all: 'Все',
+        filter_photos: 'Фото',
+        filter_videos: 'Видео',
+        video_transcode_title: 'Требуется перекодирование',
+        video_transcode_desc: 'Формат контейнера (MKV/AVI) требует перекодирования в веб-формат (1080p MP4) для плавного просмотра.',
+        video_transcode_btn: 'Перекодировать для просмотра',
+        video_transcoding: 'Обработка через FFmpeg...',
         photos_upper: 'ФОТОГРАФИЙ',
         download_album_zip: 'Скачать (ZIP)',
         hide_album: 'Скрыть',
@@ -699,6 +748,15 @@
         no_albums: 'No albums available',
         folders_count: 'folders',
         photos_count: 'photos',
+        videos_count: 'videos',
+        media_count: 'files',
+        filter_all: 'All',
+        filter_photos: 'Photos',
+        filter_videos: 'Videos',
+        video_transcode_title: 'Transcoding Required',
+        video_transcode_desc: 'This container format (MKV/AVI) requires transcoding to web-friendly MP4 (1080p) for smooth browser playback.',
+        video_transcode_btn: 'Transcode for Playback',
+        video_transcoding: 'Processing with FFmpeg...',
         photos_upper: 'PHOTOS',
         download_album_zip: 'Download (ZIP)',
         hide_album: 'Hide',
@@ -830,6 +888,8 @@
     let isSidebarCollapsed = false;
     let currentUserEditMode = 'allow';
     let suppressHashEvent = false;
+    let currentMediaTypeFilter = localStorage.getItem('pixie_media_filter') || 'all'; // 'all' | 'photo' | 'video'
+    let transcodePollTimer = null;
 
     let isZoomed = false;
     let zoomScale = 1;
@@ -895,6 +955,7 @@
       document.getElementById('pref-gap').value = savedGap;
       document.getElementById('pref-ratio').value = currentRatio;
       document.getElementById('album-sort-select').value = currentSort;
+      updateMediaTypeFilterUI();
       applyTranslations();
     }
 
@@ -953,6 +1014,31 @@
 
     function toggleGridRatio() {
       changeGridRatio(currentRatio === 'original' ? 'crop' : 'original', true);
+    }
+
+    function setMediaTypeFilter(type) {
+      currentMediaTypeFilter = type;
+      localStorage.setItem('pixie_media_filter', type);
+      updateMediaTypeFilterUI();
+      if (currentAlbumPath) {
+        renderAlbumPhotos();
+      } else {
+        renderYears('ALL');
+      }
+    }
+
+    function updateMediaTypeFilterUI() {
+      const btnAll = document.getElementById('btn-media-all');
+      const btnPhoto = document.getElementById('btn-media-photo');
+      const btnVideo = document.getElementById('btn-media-video');
+      if (!btnAll || !btnPhoto || !btnVideo) return;
+
+      const activeClasses = 'px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition';
+      const inactiveClasses = 'px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition';
+
+      btnAll.className = currentMediaTypeFilter === 'all' ? activeClasses : inactiveClasses;
+      btnPhoto.className = currentMediaTypeFilter === 'photo' ? activeClasses : inactiveClasses;
+      btnVideo.className = currentMediaTypeFilter === 'video' ? activeClasses : inactiveClasses;
     }
 
     function toggleSidebarCollapse() {
@@ -1218,26 +1304,49 @@
         return;
       }
 
-      container.innerHTML = filtered.map(yearObj => `
+      container.innerHTML = filtered.map(yearObj => {
+        let albums = yearObj.albums;
+        if (currentMediaTypeFilter === 'photo') {
+          albums = albums.filter(a => a.photo_count === undefined || a.photo_count > 0);
+        } else if (currentMediaTypeFilter === 'video') {
+          albums = albums.filter(a => a.video_count && a.video_count > 0);
+        }
+        if (!albums.length) return '';
+
+        return `
         <div id="${safeYearId(yearObj.year)}" class="home-year-group scroll-mt-24">
           <div class="flex items-baseline justify-between border-b border-stone-200 dark:border-stone-800 pb-4 mb-8">
             <h2 class="serif-title text-3xl md:text-4xl tracking-widest">${yearObj.year}</h2>
-            <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${yearObj.albums.length} ${t('folders_count')}</span>
+            <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${albums.length} ${t('folders_count')}</span>
           </div>
           <div class="photo-grid">
-            ${yearObj.albums.map(album => `
+            ${albums.map(album => {
+              let countText = `${album.count} ${album.video_count ? t('media_count') : t('photos_count')}`;
+              if (currentMediaTypeFilter === 'photo') {
+                countText = `${album.photo_count !== undefined ? album.photo_count : album.count} ${t('photos_count')}`;
+              } else if (currentMediaTypeFilter === 'video') {
+                countText = `${album.video_count || 0} ${t('videos_count')}`;
+              }
+
+              return `
               <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="home-album-card group cursor-pointer" data-search="${album.path}" title="${album.path}">
                 <div class="relative aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
                   <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                   <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
+                  ${album.video_count ? `
+                    <div class="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium tracking-wider pointer-events-none">
+                      <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                      <span>${album.video_count}</span>
+                    </div>
+                  ` : ''}
                 </div>
                 <h3 class="text-sm tracking-[0.15em] uppercase font-medium transition truncate ${album.is_hidden ? 'text-red-600 dark:text-red-400' : 'group-hover:text-stone-600 dark:group-hover:text-stone-300'}">${album.name}</h3>
-                <p class="text-xs tracking-[0.15em] text-stone-400 uppercase mt-0.5">${album.count} ${t('photos_count')}</p>
+                <p class="text-xs tracking-[0.15em] text-stone-400 uppercase mt-0.5">${countText}</p>
               </div>
-            `).join('')}
+            `}).join('')}
           </div>
         </div>
-      `).join('');
+      `}).join('');
     }
 
     function setHashSilently(newHash) {
@@ -1500,7 +1609,12 @@
       const favActionsBar = document.getElementById('fav-actions-bar');
       const favZipBtn = document.getElementById('album-fav-zip-btn');
 
-      const baseList = showOnlyFavorites ? favPhotos : currentPhotos;
+      let baseList = showOnlyFavorites ? favPhotos : currentPhotos;
+      if (currentMediaTypeFilter === 'photo') {
+        baseList = baseList.filter(p => p.media_type !== 'video');
+      } else if (currentMediaTypeFilter === 'video') {
+        baseList = baseList.filter(p => p.media_type === 'video');
+      }
       displayedPhotos = getSortedPhotos(baseList);
 
       if (showOnlyFavorites) {
@@ -1544,6 +1658,12 @@
                onload="onThumbLoaded(this, ${isCrop})"
                onerror="onThumbError(this)"
                onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:scale-105 transition-transform duration-700 ease-out" />
+          ${p.media_type === 'video' ? `
+            <div class="absolute bottom-2 left-2 z-10 flex items-center gap-1.5 px-2 py-0.5 rounded bg-black/75 backdrop-blur-xs text-white text-[11px] font-medium tracking-wider pointer-events-none">
+              <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <span>${p.duration || 'VIDEO'}</span>
+            </div>
+          ` : ''}
           <div class="thumb-retry-overlay absolute inset-0 hidden flex flex-col items-center justify-center bg-stone-100/95 dark:bg-stone-900/95 text-stone-500 z-10 text-center pointer-events-auto p-2">
             <button type="button" onclick="retryThumbManual(event, ${idx})" class="p-2.5 rounded-full border border-stone-300 dark:border-stone-700 bg-white/80 dark:bg-black/60 hover:border-stone-800 dark:hover:border-stone-300 text-stone-700 dark:text-stone-300 transition shadow-sm" title="${t('thumb_retry')}">
               <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1623,6 +1743,22 @@
       applyZoomTransform();
     }
 
+    function stopVideoPlayback() {
+      if (transcodePollTimer) {
+        clearInterval(transcodePollTimer);
+        transcodePollTimer = null;
+      }
+      const video = document.getElementById('lb-video');
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        video.classList.add('hidden');
+      }
+      const wrap = document.getElementById('lb-transcode-wrap');
+      if (wrap) wrap.classList.add('hidden');
+    }
+
     function openLightbox(index) {
       currentIndex = index;
       resetZoomState();
@@ -1632,6 +1768,7 @@
     }
 
     function closeLightbox() {
+      stopVideoPlayback();
       document.getElementById('lightbox').classList.add('hidden');
       document.body.style.overflow = '';
       resetZoomState();
@@ -1639,7 +1776,7 @@
 
     function toggleZoom() {
       const item = displayedPhotos[currentIndex];
-      if (!item) return;
+      if (!item || item.media_type === 'video') return;
       const img = document.getElementById('lb-image');
       const label = document.getElementById('zoom-label');
       const badge = document.getElementById('lb-res-badge');
@@ -1667,30 +1804,143 @@
       if (displayedPhotos.length <= 1) return;
       const nextIdx = (idx + 1) % displayedPhotos.length;
       const prevIdx = (idx - 1 + displayedPhotos.length) % displayedPhotos.length;
-      const imgNext = new Image();
-      imgNext.src = displayedPhotos[nextIdx].preview;
-      const imgPrev = new Image();
-      imgPrev.src = displayedPhotos[prevIdx].preview;
+      const pNext = displayedPhotos[nextIdx];
+      const pPrev = displayedPhotos[prevIdx];
+      if (pNext && pNext.media_type !== 'video') {
+        const imgNext = new Image();
+        imgNext.src = pNext.preview;
+      }
+      if (pPrev && pPrev.media_type !== 'video') {
+        const imgPrev = new Image();
+        imgPrev.src = pPrev.preview;
+      }
     }
 
     function stepPhoto(dir) {
       if (!displayedPhotos.length) return;
+      stopVideoPlayback();
       currentIndex = (currentIndex + dir + displayedPhotos.length) % displayedPhotos.length;
       resetZoomState();
       updateLightbox(true);
     }
 
-    function updateLightbox(reloadImage = true) {
+    async function startCurrentTranscode() {
+      const item = displayedPhotos[currentIndex];
+      if (!item) return;
+      const btn = document.getElementById('lb-btn-start-transcode');
+      const prog = document.getElementById('lb-transcode-progress');
+      if (btn) btn.classList.add('hidden');
+      if (prog) prog.classList.remove('hidden');
+
+      try {
+        await fetch(`/api/video/transcode/${encodeURIComponent(item.path)}?lib=${encodeURIComponent(currentLibraryId)}`, {
+          method: 'POST'
+        });
+      } catch (e) {
+        console.error(e);
+      }
+
+      pollTranscodeStatus(item.path);
+    }
+
+    function pollTranscodeStatus(itemPath) {
+      if (transcodePollTimer) clearInterval(transcodePollTimer);
+      transcodePollTimer = setInterval(async () => {
+        const current = displayedPhotos[currentIndex];
+        if (!current || current.path !== itemPath) {
+          clearInterval(transcodePollTimer);
+          transcodePollTimer = null;
+          return;
+        }
+        try {
+          const res = await fetch(`/api/video/status/${encodeURIComponent(itemPath)}?lib=${encodeURIComponent(currentLibraryId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'ready') {
+              clearInterval(transcodePollTimer);
+              transcodePollTimer = null;
+              const video = document.getElementById('lb-video');
+              const wrap = document.getElementById('lb-transcode-wrap');
+              wrap.classList.add('hidden');
+              video.classList.remove('hidden');
+              video.src = current.stream_url;
+              video.play().catch(() => {});
+            } else if (data.status === 'error') {
+              clearInterval(transcodePollTimer);
+              transcodePollTimer = null;
+              const pct = document.getElementById('lb-transcode-pct');
+              if (pct) pct.textContent = 'Ошибка: ' + (data.error || 'FFmpeg error');
+            }
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }, 1500);
+    }
+
+    async function updateLightbox(reloadImage = true) {
       const item = displayedPhotos[currentIndex];
       if (!item) {
         closeLightbox();
         return;
       }
+      stopVideoPlayback();
+
       const img = document.getElementById('lb-image');
-      if (reloadImage) {
-        img.onload = null;
-        img.src = isZoomed ? item.original : item.preview;
-        preloadNeighbors(currentIndex);
+      const video = document.getElementById('lb-video');
+      const wrap = document.getElementById('lb-transcode-wrap');
+      const zoomBtn = document.getElementById('lb-zoom-btn');
+      const badge = document.getElementById('lb-res-badge');
+
+      if (item.media_type === 'video') {
+        img.classList.add('hidden');
+        if (zoomBtn) zoomBtn.classList.add('hidden');
+        badge.textContent = item.is_native_video ? 'VIDEO' : 'TRANSCODE';
+
+        if (item.is_native_video) {
+          video.classList.remove('hidden');
+          wrap.classList.add('hidden');
+          video.src = item.stream_url;
+          video.play().catch(() => {});
+        } else {
+          try {
+            const res = await fetch(`/api/video/status/${encodeURIComponent(item.path)}?lib=${encodeURIComponent(currentLibraryId)}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.status === 'ready') {
+                video.classList.remove('hidden');
+                wrap.classList.add('hidden');
+                video.src = item.stream_url;
+                video.play().catch(() => {});
+              } else if (data.status === 'processing') {
+                video.classList.add('hidden');
+                wrap.classList.remove('hidden');
+                document.getElementById('lb-btn-start-transcode').classList.add('hidden');
+                document.getElementById('lb-transcode-progress').classList.remove('hidden');
+                pollTranscodeStatus(item.path);
+              } else {
+                video.classList.add('hidden');
+                wrap.classList.remove('hidden');
+                document.getElementById('lb-btn-start-transcode').classList.remove('hidden');
+                document.getElementById('lb-transcode-progress').classList.add('hidden');
+              }
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      } else {
+        video.classList.add('hidden');
+        wrap.classList.add('hidden');
+        img.classList.remove('hidden');
+        if (zoomBtn) zoomBtn.classList.remove('hidden');
+        badge.textContent = isZoomed ? t('badge_orig') : t('badge_preview');
+
+        if (reloadImage) {
+          img.onload = null;
+          img.src = isZoomed ? item.original : item.preview;
+          preloadNeighbors(currentIndex);
+        }
       }
 
       const dlSep = item.original.includes('?') ? '&' : '?';
@@ -1709,7 +1959,18 @@
       }
 
       const exifEl = document.getElementById('lb-exif');
-      if (appSettings.show_exif && item.exif && Object.keys(item.exif).length > 0) {
+      if (item.media_type === 'video') {
+        const v = item.video_info || {};
+        const parts = [];
+        if (v.duration_str) parts.push(`<span>▶ ${v.duration_str}</span>`);
+        if (v.resolution) parts.push(`<span>${v.resolution}</span>`);
+        if (v.video_codec) parts.push(`<span>${v.video_codec}</span>`);
+        if (v.audio_codec) parts.push(`<span>${v.audio_codec}</span>`);
+        if (v.container) parts.push(`<span>${v.container}</span>`);
+        if (v.size_str) parts.push(`<span>${v.size_str}</span>`);
+        if (v.sort_date) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.calendar}${v.sort_date}</span>`);
+        exifEl.innerHTML = parts.join('<span class="text-stone-400">•</span>');
+      } else if (appSettings.show_exif && item.exif && Object.keys(item.exif).length > 0) {
         const parts = [];
         if (item.exif.camera) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.camera}${item.exif.camera}</span>`);
         if (item.exif.lens) parts.push(`<span class="inline-flex items-center">${SVG_ICONS.lens}${item.exif.lens}</span>`);

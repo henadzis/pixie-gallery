@@ -5,6 +5,8 @@ import time
 import hashlib
 import zipfile
 import threading
+import subprocess
+import shutil
 import gc
 from fnmatch import fnmatch
 from io import BytesIO
@@ -15,7 +17,7 @@ from collections import OrderedDict
 
 import jwt
 from fastapi import FastAPI, HTTPException, Request, Depends, Cookie, Response, BackgroundTasks
-from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from PIL import Image, ImageOps, ExifTags
@@ -38,11 +40,26 @@ DEFAULT_EXCLUDE_MASKS = os.getenv(
 )
 
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_CACHE_DIR = CACHE_DIR / "transcoded"
+VIDEO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 DB_FILE = CACHE_DIR / "config_db.json"
 EXIF_CACHE_FILE = CACHE_DIR / "exif_cache.json"
+VIDEO_META_CACHE_FILE = CACHE_DIR / "video_meta_cache.json"
 
 templates = Jinja2Templates(directory="app/templates")
-SUPPORTED_WEB_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+
+SUPPORTED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp"}
+SUPPORTED_WEB_EXTS = SUPPORTED_IMAGE_EXTS  # backward compatibility alias
+
+SUPPORTED_NATIVE_VIDEO_EXTS = {".mp4", ".m4v", ".webm", ".mov"}
+SUPPORTED_TRANSCODE_VIDEO_EXTS = {".mkv", ".avi", ".wmv", ".flv", ".mts", ".m2ts", ".ts", ".3gp"}
+SUPPORTED_VIDEO_EXTS = SUPPORTED_NATIVE_VIDEO_EXTS | SUPPORTED_TRANSCODE_VIDEO_EXTS
+SUPPORTED_MEDIA_EXTS = SUPPORTED_IMAGE_EXTS | SUPPORTED_VIDEO_EXTS
+
+video_transcode_status = {}  # {hash_str: {"status": "processing"|"ready"|"error", "progress": int, "error": str}}
+video_transcode_lock = threading.Lock()
+video_meta_lock = threading.Lock()
+_video_meta_cache: Optional[dict] = None
 
 pregen_status = {
     "running": False,
@@ -231,11 +248,11 @@ def is_folder_hidden(rel_path: str, hidden_folders: list, lib_id: str = "default
     return False
 
 
-def is_valid_image(p: Path, excluded_exts: set = None, excluded_masks: list = None) -> bool:
+def is_valid_media(p: Path, excluded_exts: set = None, excluded_masks: list = None) -> bool:
     if not p.is_file() or p.name.startswith("."):
         return False
     ext = p.suffix.lower()
-    if ext not in SUPPORTED_WEB_EXTS:
+    if ext not in SUPPORTED_MEDIA_EXTS:
         return False
     if excluded_exts is None or excluded_masks is None:
         ex_exts, ex_masks, _ = get_filter_rules()
@@ -249,6 +266,30 @@ def is_valid_image(p: Path, excluded_exts: set = None, excluded_masks: list = No
         if fnmatch(fname_lower, mask):
             return False
     return True
+
+
+def is_valid_image(p: Path, excluded_exts: set = None, excluded_masks: list = None) -> bool:
+    if not is_valid_media(p, excluded_exts, excluded_masks):
+        return False
+    return p.suffix.lower() in SUPPORTED_IMAGE_EXTS
+
+
+def is_valid_video(p: Path, excluded_exts: set = None, excluded_masks: list = None) -> bool:
+    if not is_valid_media(p, excluded_exts, excluded_masks):
+        return False
+    return p.suffix.lower() in SUPPORTED_VIDEO_EXTS
+
+
+def find_companion_poster(video_path: Path) -> Optional[Path]:
+    parent = video_path.parent
+    stem_lower = video_path.stem.lower()
+    try:
+        for child in parent.iterdir():
+            if child.is_file() and child.stem.lower() == stem_lower and child.suffix.lower() in SUPPORTED_IMAGE_EXTS:
+                return child
+    except Exception:
+        pass
+    return None
 
 
 def create_token(username: str, role: str) -> str:
@@ -354,20 +395,316 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
     with thumb_semaphore:
         if not cache_file.exists():
             cache_file.parent.mkdir(parents=True, exist_ok=True)
-            with Image.open(orig_path) as img:
-                if hasattr(img, "draft") and img.format in ("JPEG", "MPO"):
-                    try:
-                        img.draft("RGB", (target_size * 2, target_size * 2))
-                    except Exception:
-                        pass
-                img = ImageOps.exif_transpose(img)
-                if img.mode != "RGB":
-                    img = img.convert("RGB")
-                img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
-                quality = 85 if target_size == 1200 else 80
-                img.save(cache_file, "WEBP", quality=quality)
+            ext = orig_path.suffix.lower()
+            if ext in SUPPORTED_VIDEO_EXTS:
+                poster = find_companion_poster(orig_path)
+                if poster and poster.exists():
+                    with Image.open(poster) as img:
+                        img = ImageOps.exif_transpose(img)
+                        if img.mode != "RGB":
+                            img = img.convert("RGB")
+                        img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+                        quality = 85 if target_size == 1200 else 80
+                        img.save(cache_file, "WEBP", quality=quality)
+                else:
+                    meta, _ = extract_video_metadata(orig_path)
+                    dur = meta.get("duration", 0.0)
+                    if dur > 0 and dur < 4.0:
+                        target_ss = max(0.0, dur / 2.0)
+                    else:
+                        target_ss = 4.0
+
+                    frame_img = None
+                    for attempt_ss in [target_ss, 0.0]:
+                        try:
+                            cmd = [
+                                "ffmpeg",
+                                "-ss", f"{attempt_ss:.2f}",
+                                "-i", str(orig_path),
+                                "-vframes", "1",
+                                "-f", "image2",
+                                "-vcodec", "png",
+                                "pipe:1"
+                            ]
+                            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=20)
+                            if proc.returncode == 0 and len(proc.stdout) > 0:
+                                frame_img = Image.open(BytesIO(proc.stdout))
+                                break
+                        except Exception:
+                            continue
+
+                    if frame_img is not None:
+                        frame_img = ImageOps.exif_transpose(frame_img)
+                        if frame_img.mode != "RGB":
+                            frame_img = frame_img.convert("RGB")
+                        frame_img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+                        quality = 85 if target_size == 1200 else 80
+                        frame_img.save(cache_file, "WEBP", quality=quality)
+                    else:
+                        raise RuntimeError(f"Could not extract video thumbnail for {orig_path.name}")
+            else:
+                with Image.open(orig_path) as img:
+                    if hasattr(img, "draft") and img.format in ("JPEG", "MPO"):
+                        try:
+                            img.draft("RGB", (target_size * 2, target_size * 2))
+                        except Exception:
+                            pass
+                    img = ImageOps.exif_transpose(img)
+                    if img.mode != "RGB":
+                        img = img.convert("RGB")
+                    img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
+                    quality = 85 if target_size == 1200 else 80
+                    img.save(cache_file, "WEBP", quality=quality)
             gc.collect()
     return cache_file
+
+
+def load_video_meta_cache() -> dict:
+    global _video_meta_cache
+    if _video_meta_cache is not None:
+        return _video_meta_cache
+    with video_meta_lock:
+        if _video_meta_cache is not None:
+            return _video_meta_cache
+        data = {}
+        if VIDEO_META_CACHE_FILE.exists():
+            try:
+                with open(VIDEO_META_CACHE_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+        _video_meta_cache = data
+        return _video_meta_cache
+
+
+def save_video_meta_cache():
+    global _video_meta_cache
+    with video_meta_lock:
+        if _video_meta_cache is None:
+            return
+        tmp_file = CACHE_DIR / "video_meta_cache.tmp"
+        try:
+            with open(tmp_file, "w", encoding="utf-8") as f:
+                json.dump(_video_meta_cache, f, ensure_ascii=False)
+            tmp_file.replace(VIDEO_META_CACHE_FILE)
+        except Exception:
+            pass
+
+
+def format_file_size(size_bytes: int) -> str:
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    elif size_bytes < 1024 * 1024 * 1024:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
+    else:
+        return f"{size_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def extract_video_metadata(video_path: Path) -> tuple[dict, bool]:
+    cache = load_video_meta_cache()
+    try:
+        stat = video_path.stat()
+        mtime = int(stat.st_mtime)
+        size = stat.st_size
+    except Exception:
+        mtime = 0
+        size = 0
+
+    key = str(video_path)
+    cached = cache.get(key)
+    if cached and cached.get("mtime") == mtime:
+        return cached.get("data", {}), False
+
+    meta = {
+        "duration": 0.0,
+        "duration_str": "00:00",
+        "width": 0,
+        "height": 0,
+        "resolution": "",
+        "video_codec": "",
+        "audio_codec": "",
+        "container": video_path.suffix.lstrip(".").upper(),
+        "size_str": format_file_size(size),
+        "sort_date": ""
+    }
+
+    try:
+        cmd = [
+            "ffprobe",
+            "-v", "error",
+            "-show_entries", "format=duration,size,tags:stream=width,height,codec_name,codec_type",
+            "-of", "json",
+            str(video_path)
+        ]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=12)
+        if proc.returncode == 0:
+            parsed = json.loads(proc.stdout)
+            fmt = parsed.get("format", {})
+            try:
+                dur = float(fmt.get("duration", 0) or 0)
+            except Exception:
+                dur = 0.0
+            meta["duration"] = dur
+            total_sec = int(round(dur))
+            mins = total_sec // 60
+            secs = total_sec % 60
+            if mins >= 60:
+                hours = mins // 60
+                mins = mins % 60
+                meta["duration_str"] = f"{hours:02d}:{mins:02d}:{secs:02d}"
+            else:
+                meta["duration_str"] = f"{mins:02d}:{secs:02d}"
+
+            tags = fmt.get("tags", {})
+            creation_time = tags.get("creation_time") or tags.get("date")
+            if creation_time:
+                clean_date = re.sub(r"[T\s]", " ", creation_time[:19]).replace(":", "-", 2)
+                meta["sort_date"] = clean_date
+
+            for st in parsed.get("streams", []):
+                ctype = st.get("codec_type")
+                if ctype == "video" and not meta["video_codec"]:
+                    meta["video_codec"] = (st.get("codec_name") or "").upper()
+                    w = st.get("width")
+                    h = st.get("height")
+                    if w and h:
+                        meta["width"] = int(w)
+                        meta["height"] = int(h)
+                        meta["resolution"] = f"{w}×{h}"
+                elif ctype == "audio" and not meta["audio_codec"]:
+                    meta["audio_codec"] = (st.get("codec_name") or "").upper()
+    except Exception:
+        pass
+
+    if not meta["sort_date"]:
+        try:
+            mtime = video_path.stat().st_mtime
+            meta["sort_date"] = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(mtime))
+        except Exception:
+            meta["sort_date"] = ""
+
+    with video_meta_lock:
+        cache[key] = {"mtime": mtime, "data": meta}
+
+    return meta, True
+
+
+def range_file_response(request: Request, file_path: Path, media_type: str = "video/mp4") -> Response:
+    try:
+        stat = file_path.stat()
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_size = stat.st_size
+    range_header = request.headers.get("range")
+
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": media_type,
+        "Cache-Control": "public, max-age=3600",
+    }
+
+    def iter_file(path: Path, offset: int, length: int, chunk_size: int = 256 * 1024):
+        with open(path, "rb") as f:
+            f.seek(offset)
+            remaining = length
+            while remaining > 0:
+                chunk = min(chunk_size, remaining)
+                data = f.read(chunk)
+                if not data:
+                    break
+                remaining -= len(data)
+                yield data
+
+    if not range_header:
+        headers["Content-Length"] = str(file_size)
+        return StreamingResponse(
+            iter_file(file_path, 0, file_size),
+            status_code=200,
+            headers=headers
+        )
+
+    try:
+        range_val = range_header.strip().lower()
+        if not range_val.startswith("bytes="):
+            raise ValueError()
+        parts = range_val[6:].split("-")
+        start_str = parts[0].strip()
+        end_str = parts[1].strip() if len(parts) > 1 else ""
+
+        if start_str and end_str:
+            start = int(start_str)
+            end = int(end_str)
+        elif start_str:
+            start = int(start_str)
+            end = file_size - 1
+        elif end_str:
+            start = max(0, file_size - int(end_str))
+            end = file_size - 1
+        else:
+            raise ValueError()
+
+        if start < 0 or end >= file_size or start > end:
+            return Response(
+                status_code=416,
+                headers={"Content-Range": f"bytes */{file_size}"}
+            )
+    except Exception:
+        return Response(
+            status_code=416,
+            headers={"Content-Range": f"bytes */{file_size}"}
+        )
+
+    content_length = end - start + 1
+    headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
+    headers["Content-Length"] = str(content_length)
+
+    return StreamingResponse(
+        iter_file(file_path, start, content_length),
+        status_code=206,
+        headers=headers
+    )
+
+
+def transcode_video_worker(orig_path: Path, output_file: Path, transcode_id: str):
+    try:
+        temp_output = output_file.with_suffix(".tmp.mp4")
+        if temp_output.exists():
+            try:
+                temp_output.unlink()
+            except Exception:
+                pass
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i", str(orig_path),
+            "-vf", "scale='min(1920,iw)':-2",
+            "-c:v", "libx264",
+            "-preset", "fast",
+            "-crf", "23",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            "-movflags", "+faststart",
+            str(temp_output)
+        ]
+        with video_transcode_lock:
+            video_transcode_status[transcode_id] = {"status": "processing", "progress": 10}
+
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if proc.returncode == 0 and temp_output.exists() and temp_output.stat().st_size > 0:
+            temp_output.replace(output_file)
+            with video_transcode_lock:
+                video_transcode_status[transcode_id] = {"status": "ready", "progress": 100}
+        else:
+            with video_transcode_lock:
+                err_msg = proc.stderr[-300:] if proc.stderr else "FFmpeg transcode failed"
+                video_transcode_status[transcode_id] = {"status": "error", "error": err_msg}
+    except Exception as e:
+        with video_transcode_lock:
+            video_transcode_status[transcode_id] = {"status": "error", "error": str(e)}
 
 
 def extract_exif_data_cached(orig_path: Path) -> tuple[dict, bool]:
@@ -510,6 +847,31 @@ async def favicon():
     raise HTTPException(status_code=404, detail="Favicon not found")
 
 
+@app.get("/manifest.json", include_in_schema=False)
+async def web_manifest():
+    db = load_db()
+    title = db.get("settings", {}).get("gallery_title", "PHOTO ARCHIVE")
+    manifest = {
+        "name": title,
+        "short_name": title[:16] if title else "Gallery",
+        "description": "Minimalist Photo Archive & Gallery",
+        "start_url": "/",
+        "display": "standalone",
+        "orientation": "any",
+        "background_color": "#faf9f6",
+        "theme_color": "#121212",
+        "icons": [
+            {
+                "src": "/pixie_gallery.svg",
+                "sizes": "any",
+                "type": "image/svg+xml",
+                "purpose": "any maskable"
+            }
+        ]
+    }
+    return JSONResponse(manifest, media_type="application/manifest+json")
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     db = load_db()
@@ -648,7 +1010,7 @@ def delete_library(lib_id: str, user: dict = Depends(get_current_user)):
 
 @app.post("/api/cache/clear")
 def clear_cache(user: dict = Depends(get_current_user)):
-    global _exif_mem_cache
+    global _exif_mem_cache, _video_meta_cache
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
 
@@ -663,8 +1025,20 @@ def clear_cache(user: dict = Depends(get_current_user)):
                         count += 1
                     except Exception:
                         pass
+    if VIDEO_CACHE_DIR.exists():
+        for f in os.listdir(VIDEO_CACHE_DIR):
+            try:
+                (VIDEO_CACHE_DIR / f).unlink()
+            except Exception:
+                pass
+
     with exif_lock:
         _exif_mem_cache = OrderedDict()
+    with video_meta_lock:
+        _video_meta_cache = {}
+    with video_transcode_lock:
+        video_transcode_status.clear()
+
     gc.collect()
     return {"status": "ok", "deleted_files": count}
 
@@ -744,8 +1118,8 @@ def toggle_favorite(req: FavoriteToggleRequest, user: dict = Depends(get_current
         raise HTTPException(status_code=403, detail="Access denied")
     orig_path = safe_resolve(rel_clean, lib_id, db)
     ex_exts, ex_masks, _ = get_filter_rules(db)
-    if not is_valid_image(orig_path, ex_exts, ex_masks):
-        raise HTTPException(status_code=404, detail="Image not found")
+    if not is_valid_media(orig_path, ex_exts, ex_masks):
+        raise HTTPException(status_code=404, detail="File not found")
     uname = user["username"]
     user_favs = set(db.setdefault("favorites", {}).get(uname, []))
     fav_key = rel_clean if lib_id == "default" else f"{lib_id}::{rel_clean}"
@@ -788,7 +1162,7 @@ def run_all_thumbnails_task():
                     continue
             for f in files:
                 p = Path(root) / f
-                if is_valid_image(p, ex_exts, ex_masks):
+                if is_valid_media(p, ex_exts, ex_masks):
                     all_images.append(p)
 
     with pregen_lock:
@@ -796,6 +1170,7 @@ def run_all_thumbnails_task():
         pregen_status["processed"] = 0
 
     exif_dirty = False
+    video_dirty = False
     for idx, img_path in enumerate(all_images, start=1):
         if pregen_status["cancel_requested"]:
             break
@@ -804,9 +1179,14 @@ def run_all_thumbnails_task():
         try:
             generate_cached_thumb(img_path, 400)
             generate_cached_thumb(img_path, 1200)
-            _, updated = extract_exif_data_cached(img_path)
-            if updated:
-                exif_dirty = True
+            if img_path.suffix.lower() in SUPPORTED_VIDEO_EXTS:
+                _, v_up = extract_video_metadata(img_path)
+                if v_up:
+                    video_dirty = True
+            else:
+                _, updated = extract_exif_data_cached(img_path)
+                if updated:
+                    exif_dirty = True
         except Exception:
             pass
         
@@ -818,6 +1198,8 @@ def run_all_thumbnails_task():
 
     if exif_dirty:
         save_exif_cache()
+    if video_dirty:
+        save_video_meta_cache()
 
     with pregen_lock:
         pregen_status["running"] = False
@@ -898,12 +1280,17 @@ def scan_all_albums_recursive(
         if is_hidden and not show_hidden:
             continue
 
-        valid_imgs = sorted(
-            [f for f in current_dir.iterdir() if is_valid_image(f, ex_exts, ex_masks)],
+        all_media = [f for f in current_dir.iterdir() if is_valid_media(f, ex_exts, ex_masks)]
+        if not all_media:
+            continue
+
+        video_stems = {f.stem.lower() for f in all_media if f.suffix.lower() in SUPPORTED_VIDEO_EXTS}
+        valid_items = sorted(
+            [f for f in all_media if not (f.suffix.lower() in SUPPORTED_IMAGE_EXTS and f.stem.lower() in video_stems)],
             key=lambda x: x.name
         )
-        if valid_imgs:
-            cover_rel = valid_imgs[0].relative_to(lib_root).as_posix()
+        if valid_items:
+            cover_rel = valid_items[0].relative_to(lib_root).as_posix()
             parts = rel_path.split("/")
             year_tag = parts[0] if len(parts) > 0 else "Archive"
 
@@ -912,11 +1299,16 @@ def scan_all_albums_recursive(
             else:
                 display_name = parts[0]
 
+            photo_count = sum(1 for f in valid_items if f.suffix.lower() in SUPPORTED_IMAGE_EXTS)
+            video_count = sum(1 for f in valid_items if f.suffix.lower() in SUPPORTED_VIDEO_EXTS)
+
             albums_flat.append({
                 "name": display_name,
                 "path": rel_path,
                 "year": year_tag,
-                "count": len(valid_imgs),
+                "count": len(valid_items),
+                "photo_count": photo_count,
+                "video_count": video_count,
                 "cover": f"/api/thumb/400/{quote(cover_rel)}?lib={q_lib}",
                 "is_hidden": is_hidden
             })
@@ -1053,32 +1445,70 @@ def get_album(album_path: str, lib: Optional[str] = "default", user: dict = Depe
     show_exif = db.get("settings", {}).get("show_exif", True)
     user_favs = set(db.get("favorites", {}).get(user["username"], []))
 
-    images = sorted([f for f in target_dir.iterdir() if is_valid_image(f, ex_exts, ex_masks)], key=lambda x: x.name)
+    all_media = [f for f in target_dir.iterdir() if is_valid_media(f, ex_exts, ex_masks)]
+    video_stems = {f.stem.lower() for f in all_media if f.suffix.lower() in SUPPORTED_VIDEO_EXTS}
+    valid_items = sorted(
+        [f for f in all_media if not (f.suffix.lower() in SUPPORTED_IMAGE_EXTS and f.stem.lower() in video_stems)],
+        key=lambda x: x.name
+    )
+
     photos = []
     exif_dirty = False
+    video_dirty = False
     q_lib = quote(lib_id)
 
-    for img in images:
-        rel = img.relative_to(lib_root).as_posix()
+    for item in valid_items:
+        rel = item.relative_to(lib_root).as_posix()
         q_rel = quote(rel)
-        exif_data, updated = extract_exif_data_cached(img)
-        if updated:
-            exif_dirty = True
-
+        ext = item.suffix.lower()
+        is_video = ext in SUPPORTED_VIDEO_EXTS
         fav_key = rel if lib_id == "default" else f"{lib_id}::{rel}"
-        photos.append({
-            "name": img.name,
-            "path": rel,
-            "thumb": f"/api/thumb/400/{q_rel}?lib={q_lib}",
-            "preview": f"/api/thumb/1200/{q_rel}?lib={q_lib}",
-            "original": f"/api/original/{q_rel}?lib={q_lib}",
-            "is_favorite": fav_key in user_favs,
-            "sort_date": exif_data.get("sort_date", ""),
-            "exif": exif_data if show_exif else {}
-        })
+
+        if is_video:
+            meta, updated = extract_video_metadata(item)
+            if updated:
+                video_dirty = True
+            photos.append({
+                "name": item.name,
+                "path": rel,
+                "media_type": "video",
+                "is_native_video": ext in SUPPORTED_NATIVE_VIDEO_EXTS,
+                "duration": meta.get("duration_str", "00:00"),
+                "duration_seconds": meta.get("duration", 0),
+                "stream_url": f"/api/video/stream/{q_rel}?lib={q_lib}",
+                "thumb": f"/api/thumb/400/{q_rel}?lib={q_lib}",
+                "preview": f"/api/thumb/1200/{q_rel}?lib={q_lib}",
+                "original": f"/api/original/{q_rel}?lib={q_lib}",
+                "is_favorite": fav_key in user_favs,
+                "sort_date": meta.get("sort_date", ""),
+                "exif": {},
+                "video_info": meta if show_exif else {}
+            })
+        else:
+            exif_data, updated = extract_exif_data_cached(item)
+            if updated:
+                exif_dirty = True
+            photos.append({
+                "name": item.name,
+                "path": rel,
+                "media_type": "photo",
+                "is_native_video": False,
+                "duration": None,
+                "duration_seconds": None,
+                "stream_url": None,
+                "thumb": f"/api/thumb/400/{q_rel}?lib={q_lib}",
+                "preview": f"/api/thumb/1200/{q_rel}?lib={q_lib}",
+                "original": f"/api/original/{q_rel}?lib={q_lib}",
+                "is_favorite": fav_key in user_favs,
+                "sort_date": exif_data.get("sort_date", ""),
+                "exif": exif_data if show_exif else {},
+                "video_info": {}
+            })
 
     if exif_dirty:
         save_exif_cache()
+    if video_dirty:
+        save_video_meta_cache()
 
     parts = rel_clean.split("/")
     if len(parts) > 1:
@@ -1086,12 +1516,17 @@ def get_album(album_path: str, lib: Optional[str] = "default", user: dict = Depe
     else:
         display_name = parts[0]
 
+    photo_count = sum(1 for p in photos if p["media_type"] == "photo")
+    video_count = sum(1 for p in photos if p["media_type"] == "video")
+
     return {
         "name": display_name,
         "path": rel_clean,
         "lib": lib_id,
         "year": parts[0] if parts else "",
         "count": len(photos),
+        "photo_count": photo_count,
+        "video_count": video_count,
         "cover": photos[0]["preview"] if photos else None,
         "photos": photos
     }
@@ -1116,19 +1551,25 @@ def download_album_zip(
         raise HTTPException(status_code=404, detail="Album not found")
     ex_exts, ex_masks, _ = get_filter_rules(db)
     user_favs = set(db.get("favorites", {}).get(user["username"], []))
-    images = sorted([f for f in target_dir.iterdir() if is_valid_image(f, ex_exts, ex_masks)], key=lambda x: x.name)
+
+    all_media = [f for f in target_dir.iterdir() if is_valid_media(f, ex_exts, ex_masks)]
+    v_stems = {f.stem.lower() for f in all_media if f.suffix.lower() in SUPPORTED_VIDEO_EXTS}
+    items = sorted(
+        [f for f in all_media if not (f.suffix.lower() in SUPPORTED_IMAGE_EXTS and f.stem.lower() in v_stems)],
+        key=lambda x: x.name
+    )
     if favorites_only:
         def _is_fav(img_p: Path) -> bool:
             r = img_p.relative_to(lib_root).as_posix()
             fk = r if lib_id == "default" else f"{lib_id}::{r}"
             return fk in user_favs
-        images = [img for img in images if _is_fav(img)]
-    if not images:
-        raise HTTPException(status_code=404, detail="No photos to download")
+        items = [img for img in items if _is_fav(img)]
+    if not items:
+        raise HTTPException(status_code=404, detail="No media files to download")
     zip_buffer = BytesIO()
     with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_STORED) as zf:
-        for img in images:
-            zf.write(img, arcname=img.name)
+        for it in items:
+            zf.write(it, arcname=it.name)
     zip_buffer.seek(0)
     suffix = "_favorites" if favorites_only else ""
     safe_filename = quote(f"{target_dir.name}{suffix}.zip")
@@ -1146,8 +1587,8 @@ def _serve_thumbnail(img_path: str, target_size: int, user: dict, lib: Optional[
     if not user_can_access_image(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
     orig_path = safe_resolve(rel_clean, lib_id, db)
-    if not is_valid_image(orig_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+    if not is_valid_media(orig_path):
+        raise HTTPException(status_code=404, detail="File not found")
     try:
         cache_file = generate_cached_thumb(orig_path, target_size)
     except Exception as e:
@@ -1187,8 +1628,8 @@ def get_original(img_path: str, download: bool = False, lib: Optional[str] = "de
     if not user_can_access_image(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
     orig_path = safe_resolve(rel_clean, lib_id, db)
-    if not is_valid_image(orig_path):
-        raise HTTPException(status_code=404, detail="Image not found")
+    if not is_valid_media(orig_path):
+        raise HTTPException(status_code=404, detail="File not found")
     if download:
         return FileResponse(orig_path, filename=orig_path.name)
     safe_name = quote(orig_path.name)
@@ -1196,3 +1637,99 @@ def get_original(img_path: str, download: bool = False, lib: Optional[str] = "de
         orig_path,
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{safe_name}"}
     )
+
+
+@app.get("/api/video/stream/{video_path:path}")
+def stream_video(video_path: str, request: Request, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    rel_clean = unquote(video_path).strip("/")
+    db = load_db()
+    lib_id, _, _ = get_library_root(lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    orig_path = safe_resolve(rel_clean, lib_id, db)
+    if not is_valid_media(orig_path) or orig_path.suffix.lower() not in SUPPORTED_VIDEO_EXTS:
+        raise HTTPException(status_code=404, detail="Video not found")
+
+    ext = orig_path.suffix.lower()
+    target_stream_file = orig_path
+    media_type = "video/mp4"
+
+    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+        if ext == ".webm":
+            media_type = "video/webm"
+        elif ext == ".mov":
+            media_type = "video/quicktime"
+        else:
+            media_type = "video/mp4"
+    else:
+        stat = orig_path.stat()
+        cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+        hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+        transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+        if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+            target_stream_file = transcoded_file
+            media_type = "video/mp4"
+        else:
+            raise HTTPException(status_code=422, detail="Video needs transcoding")
+
+    return range_file_response(request, target_stream_file, media_type)
+
+
+@app.get("/api/video/status/{video_path:path}")
+def get_video_transcode_status(video_path: str, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    rel_clean = unquote(video_path).strip("/")
+    db = load_db()
+    lib_id, _, _ = get_library_root(lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    orig_path = safe_resolve(rel_clean, lib_id, db)
+    if not is_valid_media(orig_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    ext = orig_path.suffix.lower()
+    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+        return {"status": "ready", "is_native": True}
+
+    stat = orig_path.stat()
+    cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+    hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+    transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+
+    if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+        return {"status": "ready", "is_native": False}
+
+    with video_transcode_lock:
+        state = video_transcode_status.get(hash_str)
+        if state:
+            return {"status": state.get("status", "idle"), "is_native": False, "error": state.get("error")}
+
+    return {"status": "needs_transcoding", "is_native": False}
+
+
+@app.post("/api/video/transcode/{video_path:path}")
+def trigger_video_transcode(video_path: str, background_tasks: BackgroundTasks, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
+    rel_clean = unquote(video_path).strip("/")
+    db = load_db()
+    lib_id, _, _ = get_library_root(lib, db)
+    if not user_can_access_image(user, rel_clean, lib_id):
+        raise HTTPException(status_code=403, detail="Access denied")
+    orig_path = safe_resolve(rel_clean, lib_id, db)
+    if not is_valid_media(orig_path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    stat = orig_path.stat()
+    cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+    hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+    transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+
+    if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+        return {"status": "ready", "is_native": False}
+
+    with video_transcode_lock:
+        state = video_transcode_status.get(hash_str)
+        if state and state.get("status") == "processing":
+            return {"status": "processing", "is_native": False}
+        video_transcode_status[hash_str] = {"status": "processing", "progress": 5}
+
+    background_tasks.add_task(transcode_video_worker, orig_path, transcoded_file, hash_str)
+    return {"status": "started", "is_native": False}
