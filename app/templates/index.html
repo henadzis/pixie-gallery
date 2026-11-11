@@ -506,11 +506,12 @@
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
         <div id="users-list" class="space-y-2 text-xs"></div>
 
-        <form onsubmit="handleSaveUser(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
-          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" data-i18n="user_form_title">Добавить или отредактировать пользователя</div>
+        <form id="user-form" autocomplete="off" onsubmit="handleSaveUser(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
+          <input type="hidden" id="edit-u-original-name" value="" />
+          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="user-form-title" data-i18n="user_form_title">Добавить пользователя</div>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input id="new-u-name" type="text" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-            <input id="new-u-pass" type="password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <input id="new-u-name" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+            <input id="new-u-pass" type="password" autocomplete="new-password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
             <select id="new-u-role" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
               <option value="user" data-i18n="role_user">Клиент</option>
               <option value="admin" data-i18n="role_admin">Администратор</option>
@@ -543,7 +544,10 @@
             <div id="albums-checkbox-list" class="max-h-40 overflow-y-auto border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
           </div>
 
-          <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_user">Сохранить пользователя</button>
+          <div class="flex items-center gap-2">
+            <button type="submit" id="btn-save-user-submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_user">Сохранить пользователя</button>
+            <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+          </div>
         </form>
       </div>
     </div>
@@ -634,9 +638,11 @@
         status_stopping: 'Остановка...',
         status_scanning: 'Сканирование папок...',
         settings_users: 'Пользователи и доступ к альбомам',
-        user_form_title: 'Добавить или отредактировать пользователя',
-        user_ph_login: 'Логин (существующий = правка)',
-        user_ph_pass: 'Пароль (пусто = без изменений)',
+        user_form_title: 'Добавить пользователя',
+        user_form_edit_title: 'Редактировать пользователя',
+        user_ph_login: 'Логин',
+        user_ph_pass: 'Пароль',
+        user_ph_pass_edit: 'Новый пароль (пусто = без изменений)',
         role_user: 'Клиент',
         role_admin: 'Администратор',
         mode_allow: 'Разрешенные папки',
@@ -753,9 +759,11 @@
         status_stopping: 'Stopping...',
         status_scanning: 'Scanning folders...',
         settings_users: 'Users & Album Permissions',
-        user_form_title: 'Add or Edit User',
-        user_ph_login: 'Username (existing = edit)',
-        user_ph_pass: 'Password (leave blank to keep)',
+        user_form_title: 'Add User',
+        user_form_edit_title: 'Edit User',
+        user_ph_login: 'Username',
+        user_ph_pass: 'Password',
+        user_ph_pass_edit: 'New password (leave blank to keep)',
         role_user: 'Client',
         role_admin: 'Administrator',
         mode_allow: 'Allowed Folders',
@@ -1869,7 +1877,8 @@
       document.getElementById('title-saved-msg').classList.add('hidden');
       
       await loadLibrariesAdmin();
-      renderAlbumCheckboxes();
+      resetLibraryForm();
+      resetUserForm();
       renderHiddenAlbumsCheckboxes();
       await loadUsersList();
       await pollPregenStatus();
@@ -2103,37 +2112,46 @@
       }
     }
 
+    function toggleAllAlbumsCheckbox(starCb) {
+      const isChecked = starCb.checked;
+      document.querySelectorAll('#albums-checkbox-list .album-cb').forEach(cb => {
+        if (cb !== starCb) cb.checked = isChecked;
+      });
+    }
+
     function renderAlbumCheckboxes(selectedAlbums = [], mode = 'allow') {
       const box = document.getElementById('albums-checkbox-list');
-      document.querySelector(`input[name="access-mode"][value="${mode}"]`).checked = true;
+      const modeRadio = document.querySelector(`input[name="access-mode"][value="${mode}"]`);
+      if (modeRadio) modeRadio.checked = true;
       currentUserEditMode = mode;
 
       const multiLibs = adminLibraries && adminLibraries.length > 1;
-      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
+      const isAllChecked = selectedAlbums.includes('*');
+      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAllChecked ? 'checked' : ''} onchange="toggleAllAlbumsCheckbox(this)" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
       for (const a of allAlbumsCatalog) {
-        const isChecked = selectedAlbums.includes('*') || selectedAlbums.includes(a.path);
+        const isChecked = isAllChecked || selectedAlbums.includes(a.path);
         const displayName = (multiLibs && a.lib_name) ? `[${a.lib_name}] ${a.name || a.path}` : (a.name || a.path);
         html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${displayName}</span></label>`;
       }
       box.innerHTML = html;
     }
 
+    let adminUsersList = [];
+
     async function loadUsersList() {
       const res = await fetch('/api/users');
       if (!res.ok) return;
       const data = await res.json();
+      adminUsersList = data.users || [];
       const listEl = document.getElementById('users-list');
-      listEl.innerHTML = data.users.map(u => {
+      listEl.innerHTML = adminUsersList.map(u => {
         const defLibName = u.default_library
           ? (adminLibraries.find(l => l.id === u.default_library)?.name || u.default_library)
           : null;
         const defBadge = defLibName
           ? `<span class="text-[10px] bg-sky-100 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 px-1.5 py-0.5 rounded-sm" title="${t('user_default_lib')}: ${defLibName}">${t('badge_default_lib')}: ${defLibName}</span>`
           : '';
-        const safeUname = u.username.replace(/'/g, "\\'");
-        const safeRole = (u.role || '').replace(/'/g, "\\'");
-        const safeMode = (u.mode || 'allow').replace(/'/g, "\\'");
-        const safeDefLib = (u.default_library || '').replace(/'/g, "\\'");
+        const safeUname = encodeURIComponent(u.username);
 
         return `
         <div class="flex items-center justify-between bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 px-3 py-2">
@@ -2145,26 +2163,63 @@
             <span class="text-[11px] text-red-600 inline-flex items-center gap-0.5 ml-1">${SVG_ICONS.heartActive} ${u.favorites_count || 0}</span>
           </div>
           <div class="flex items-center space-x-3">
-            <button onclick="editUserPrompt('${safeUname}', '${safeRole}', '${safeMode}', '${encodeURIComponent(JSON.stringify(u.allowed_albums || []))}', '${encodeURIComponent(JSON.stringify(u.allowed_libraries || ['*']))}', '${safeDefLib}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
-            ${u.username !== currentUser.username ? `<button onclick="deleteUser('${safeUname}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
+            <button type="button" onclick="editUserPrompt('${safeUname}')" class="text-stone-600 dark:text-stone-300 hover:underline text-xs">${t('btn_edit')}</button>
+            ${u.username !== currentUser.username ? `<button type="button" onclick="deleteUser('${safeUname}')" class="text-red-600 hover:underline text-xs">${t('btn_delete')}</button>` : ''}
           </div>
         </div>
         `;
       }).join('');
     }
 
-    function editUserPrompt(username, role, mode, encAlbums, encLibs, defLib = '') {
-      document.getElementById('new-u-name').value = username;
-      document.getElementById('new-u-pass').value = '';
-      document.getElementById('new-u-role').value = role;
-      const albums = JSON.parse(decodeURIComponent(encAlbums));
-      const libs = encLibs ? JSON.parse(decodeURIComponent(encLibs)) : ['*'];
-      renderLibraryCheckboxes(libs, defLib);
-      renderAlbumCheckboxes(albums, mode);
+    function editUserPrompt(encUname) {
+      const username = decodeURIComponent(encUname);
+      const u = adminUsersList.find(x => x.username === username);
+      if (!u) return;
+
+      document.getElementById('edit-u-original-name').value = u.username;
+      const nameInput = document.getElementById('new-u-name');
+      const passInput = document.getElementById('new-u-pass');
+      nameInput.value = u.username;
+      passInput.value = '';
+      passInput.placeholder = t('user_ph_pass_edit') || 'Новый пароль (пусто = без изменений)';
+      document.getElementById('new-u-role').value = u.role || 'user';
+
+      renderLibraryCheckboxes(u.allowed_libraries || ['*'], u.default_library || '');
+      renderAlbumCheckboxes(u.allowed_albums || [], u.mode || 'allow');
+
+      const titleEl = document.getElementById('user-form-title');
+      if (titleEl) titleEl.textContent = `${t('user_form_edit_title') || 'Редактировать пользователя'}: ${u.username}`;
+
+      const cancelBtn = document.getElementById('btn-cancel-user-edit');
+      if (cancelBtn) cancelBtn.classList.remove('hidden');
+
+      const formEl = document.getElementById('user-form');
+      if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      nameInput.focus();
+    }
+
+    function resetUserForm() {
+      document.getElementById('edit-u-original-name').value = '';
+      const nameInput = document.getElementById('new-u-name');
+      const passInput = document.getElementById('new-u-pass');
+      nameInput.value = '';
+      passInput.value = '';
+      passInput.placeholder = t('user_ph_pass');
+      document.getElementById('new-u-role').value = 'user';
+
+      const titleEl = document.getElementById('user-form-title');
+      if (titleEl) titleEl.textContent = t('user_form_title');
+
+      const cancelBtn = document.getElementById('btn-cancel-user-edit');
+      if (cancelBtn) cancelBtn.classList.add('hidden');
+
+      renderLibraryCheckboxes(['*'], '');
+      renderAlbumCheckboxes([], 'allow');
     }
 
     async function handleSaveUser(e) {
       e.preventDefault();
+      const origName = document.getElementById('edit-u-original-name').value.trim();
       const username = document.getElementById('new-u-name').value.trim();
       const password = document.getElementById('new-u-pass').value;
       const role = document.getElementById('new-u-role').value;
@@ -2184,14 +2239,12 @@
           mode,
           allowed_albums: role === 'admin' ? ['*'] : checked,
           allowed_libraries: allowedLibraries,
-          default_library: defLib || null
+          default_library: defLib || null,
+          original_username: origName || null
         })
       });
       if (res.ok) {
-        document.getElementById('new-u-name').value = '';
-        document.getElementById('new-u-pass').value = '';
-        renderLibraryCheckboxes(['*'], '');
-        renderAlbumCheckboxes([], 'allow');
+        resetUserForm();
         await loadUsersList();
       } else {
         const err = await res.json();
@@ -2199,7 +2252,8 @@
       }
     }
 
-    async function deleteUser(uname) {
+    async function deleteUser(encUname) {
+      const uname = decodeURIComponent(encUname);
       if (!confirm(`${t('confirm_del_user')} ${uname}?`)) return;
       await fetch(`/api/users/${encodeURIComponent(uname)}`, { method: 'DELETE' });
       await loadUsersList();

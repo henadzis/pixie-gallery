@@ -307,16 +307,24 @@ def user_can_access_album(user: dict, album_rel_path: str, lib_id: str = "defaul
     if "*" in albums:
         return True if mode == "allow" else False
 
-    norm_album = album_rel_path.strip("/")
-    prefixed_album = f"{lib_id}::{norm_album}"
+    norm_album = album_rel_path.strip("/").lower()
+    norm_lib = (lib_id or "default").strip().lower()
+    prefixed_album = f"{norm_lib}::{norm_album}"
     matched = False
+
     for allowed in albums:
-        norm_allowed = allowed.strip("/")
+        norm_allowed = allowed.strip("/").lower()
+        if not norm_allowed:
+            continue
         if "::" in norm_allowed:
             if prefixed_album == norm_allowed or prefixed_album.startswith(norm_allowed + "/"):
                 matched = True
                 break
-        elif lib_id == "default":
+            parts = norm_allowed.split("::", 1)
+            if parts[0] == norm_lib and (norm_album == parts[1] or norm_album.startswith(parts[1] + "/")):
+                matched = True
+                break
+        else:
             if norm_album == norm_allowed or norm_album.startswith(norm_allowed + "/"):
                 matched = True
                 break
@@ -483,6 +491,7 @@ class UserUpsertRequest(BaseModel):
     allowed_albums: List[str] = []
     allowed_libraries: List[str] = ["*"]
     default_library: Optional[str] = None
+    original_username: Optional[str] = None
 
 
 class FavoriteToggleRequest(BaseModel):
@@ -689,6 +698,13 @@ def save_user(req: UserUpsertRequest, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=400, detail="Username required")
     db = load_db()
     existing = db.setdefault("users", {}).get(uname)
+    orig_name = (req.original_username or "").strip()
+    if orig_name and orig_name != uname and orig_name in db.get("users", {}):
+        old_data = db["users"].pop(orig_name)
+        if not existing:
+            existing = old_data
+            if orig_name in db.get("favorites", {}):
+                db["favorites"][uname] = db["favorites"].pop(orig_name)
     if not existing and not req.password:
         raise HTTPException(status_code=400, detail="Password required for new user")
 
@@ -946,26 +962,45 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
     active_id = active_lib["id"]
     _, active_root, _ = get_library_root(active_id, db)
 
-    raw_years = scan_all_albums_recursive(
-        ex_exts, ex_masks, hidden_folders, show_hidden,
-        lib_id=active_id, lib_root=active_root
-    )
+    def _filter_years_for_lib(target_lib_id, target_root):
+        raw = scan_all_albums_recursive(
+            ex_exts, ex_masks, hidden_folders, show_hidden,
+            lib_id=target_lib_id, lib_root=target_root
+        )
+        f_years = []
+        f_flat = []
+        for y in raw:
+            allowed_list = []
+            for alb in y["albums"]:
+                if user_can_access_album(user, alb["path"], target_lib_id):
+                    allowed_list.append(alb)
+                    f_flat.append({
+                        "path": alb["path"],
+                        "label": alb["path"],
+                        "name": alb["name"]
+                    })
+            if allowed_list:
+                f_years.append({"year": y["year"], "albums": allowed_list})
+        return f_years, f_flat
 
-    filtered_years = []
-    active_albums_flat = []
+    filtered_years, active_albums_flat = _filter_years_for_lib(active_id, active_root)
 
-    for y in raw_years:
-        allowed_list = []
-        for alb in y["albums"]:
-            if user_can_access_album(user, alb["path"], active_id):
-                allowed_list.append(alb)
-                active_albums_flat.append({
-                    "path": alb["path"],
-                    "label": alb["path"],
-                    "name": alb["name"]
-                })
-        if allowed_list:
-            filtered_years.append({"year": y["year"], "albums": allowed_list})
+    # If active_lib has no accessible albums for this non-admin user, but another library does, auto-switch:
+    if not filtered_years and user["role"] != "admin" and len(accessible_libs) > 1:
+        for other_lib in accessible_libs:
+            if other_lib["id"] == active_id:
+                continue
+            try:
+                _, other_root, _ = get_library_root(other_lib["id"], db)
+                o_years, o_flat = _filter_years_for_lib(other_lib["id"], other_root)
+                if o_years:
+                    active_lib = other_lib
+                    active_id = other_lib["id"]
+                    filtered_years = o_years
+                    active_albums_flat = o_flat
+                    break
+            except Exception:
+                continue
 
     admin_catalog = []
     if user["role"] == "admin":
