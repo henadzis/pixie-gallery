@@ -134,15 +134,14 @@
           <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
 
-        <button onclick="showHome()" class="inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 text-xs uppercase transition bg-transparent text-stone-800 dark:text-stone-200 shrink-0">
+        <button onclick="showHome()" id="header-home-btn" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 transition bg-transparent text-stone-800 dark:text-stone-200 shrink-0" title="На главную" data-i18n-title="nav_home">
           <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V9.5z"/>
           </svg>
-          <span class="hidden sm:inline" data-i18n="nav_home">На главную</span>
         </button>
 
         <div id="library-switcher-wrap" class="relative hidden shrink-0">
-          <button type="button" id="library-switcher-btn" onclick="toggleLibraryDropdown(event)" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs transition bg-transparent text-stone-800 dark:text-stone-200">
+          <button type="button" id="library-switcher-btn" onclick="toggleLibraryDropdown(event)" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 transition bg-transparent text-stone-800 dark:text-stone-200">
             <svg id="library-chevron-icon" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"></polyline>
             </svg>
@@ -150,9 +149,9 @@
           <div id="library-dropdown-menu" class="hidden absolute left-0 mt-1.5 min-w-[200px] max-w-xs bg-white dark:bg-[#1a1a1a] border border-stone-200 dark:border-stone-800 shadow-lg py-1 z-50 text-xs"></div>
         </div>
 
-        <button onclick="showHome()" id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium hover:opacity-70 transition text-left ml-1 truncate">
+        <span id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium text-left ml-1 truncate select-none">
           {{ title }}
-        </button>
+        </span>
       </div>
 
       <div class="flex items-center space-x-2 md:space-x-3 text-xs tracking-[0.12em] uppercase shrink-0">
@@ -1135,11 +1134,10 @@
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('current-user-badge').textContent = currentUser.username;
 
-      if (appSettings.gallery_title) {
-        document.title = appSettings.gallery_title;
-        document.getElementById('header-brand-title').textContent = appSettings.gallery_title;
-        document.getElementById('login-modal-title').textContent = appSettings.gallery_title;
-      }
+      const titleText = (appSettings.gallery_title || '').trim();
+      document.title = titleText || 'Photo Archive';
+      document.getElementById('header-brand-title').textContent = titleText;
+      document.getElementById('login-modal-title').textContent = titleText;
 
       if (currentUser.role === 'admin') {
         document.getElementById('settings-btn').classList.remove('hidden');
@@ -2320,7 +2318,7 @@
     }
 
     async function openSettingsModal() {
-      document.getElementById('pref-gallery-title').value = appSettings.gallery_title || 'PHOTO ARCHIVE';
+      document.getElementById('pref-gallery-title').value = appSettings.gallery_title ?? '';
       document.getElementById('opt-show-exif').checked = !!appSettings.show_exif;
       document.getElementById('opt-allow-zip').checked = !!appSettings.allow_zip_download;
       document.getElementById('opt-show-hidden').checked = !!appSettings.show_hidden_albums;
@@ -2489,11 +2487,10 @@
       if (res.ok) {
         const data = await res.json();
         appSettings = data.settings;
-        if (appSettings.gallery_title) {
-          document.title = appSettings.gallery_title;
-          document.getElementById('header-brand-title').textContent = appSettings.gallery_title;
-          document.getElementById('login-modal-title').textContent = appSettings.gallery_title;
-        }
+        const updatedTitle = (appSettings.gallery_title || '').trim();
+        document.title = updatedTitle || 'Photo Archive';
+        document.getElementById('header-brand-title').textContent = updatedTitle;
+        document.getElementById('login-modal-title').textContent = updatedTitle;
         const msg = document.getElementById('title-saved-msg');
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 3000);

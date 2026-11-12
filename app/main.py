@@ -805,7 +805,7 @@ class LoginRequest(BaseModel):
 
 
 class SettingsUpdateRequest(BaseModel):
-    gallery_title: str = "PHOTO ARCHIVE"
+    gallery_title: str = ""
     show_exif: bool
     allow_zip_download: bool
     exclude_extensions: str = ""
@@ -850,9 +850,9 @@ async def favicon():
 @app.get("/manifest.json", include_in_schema=False)
 async def web_manifest():
     db = load_db()
-    title = db.get("settings", {}).get("gallery_title", "PHOTO ARCHIVE")
+    title = db.get("settings", {}).get("gallery_title", "")
     manifest = {
-        "name": title,
+        "name": title or "Photo Archive",
         "short_name": title[:16] if title else "Gallery",
         "description": "Minimalist Photo Archive & Gallery",
         "start_url": "/",
@@ -875,7 +875,7 @@ async def web_manifest():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     db = load_db()
-    title = db.get("settings", {}).get("gallery_title", "PHOTO ARCHIVE")
+    title = db.get("settings", {}).get("gallery_title", "")
     return templates.TemplateResponse("index.html", {"request": request, "title": title})
 
 
@@ -910,7 +910,7 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
     db = load_db()
     existing_libs = get_libraries_list(db)
     db["settings"] = {
-        "gallery_title": req.gallery_title.strip() or "PHOTO ARCHIVE",
+        "gallery_title": req.gallery_title.strip(),
         "show_exif": req.show_exif,
         "allow_zip_download": req.allow_zip_download,
         "exclude_extensions": req.exclude_extensions.strip(),
