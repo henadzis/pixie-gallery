@@ -156,11 +156,16 @@
       </div>
 
       <div class="flex items-center space-x-2 md:space-x-3 text-xs tracking-[0.12em] uppercase shrink-0">
-        <!-- Глобальный переключатель медиа для активной библиотеки -->
-        <div id="media-filter-btn-group" class="inline-flex items-center border border-stone-300 dark:border-stone-700 p-0.5 text-[11px] tracking-wider shrink-0">
-          <button type="button" onclick="setMediaTypeFilter('all')" id="btn-media-all" class="px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition" data-i18n="filter_all">Все</button>
-          <button type="button" onclick="setMediaTypeFilter('photo')" id="btn-media-photo" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_photos">Фото</button>
-          <button type="button" onclick="setMediaTypeFilter('video')" id="btn-media-video" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_videos">Видео</button>
+        <!-- Глобальный переключатель медиа и избранного для активной библиотеки -->
+        <div class="inline-flex items-center gap-1.5 shrink-0">
+          <div id="media-filter-btn-group" class="inline-flex items-center border border-stone-300 dark:border-stone-700 p-0.5 text-[11px] tracking-wider shrink-0">
+            <button type="button" onclick="setMediaTypeFilter('all')" id="btn-media-all" class="px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition" data-i18n="filter_all">Все</button>
+            <button type="button" onclick="setMediaTypeFilter('photo')" id="btn-media-photo" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_photos">Фото</button>
+            <button type="button" onclick="setMediaTypeFilter('video')" id="btn-media-video" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_videos">Видео</button>
+          </div>
+          <button type="button" onclick="toggleGlobalFavoritesFilter()" id="btn-media-fav" title="Только избранное" data-i18n-title="filter_favorites_title" aria-pressed="false" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-600 dark:text-stone-400 transition">
+            <svg id="btn-media-fav-icon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </button>
         </div>
 
         <button onclick="toggleGridRatio()" id="ratio-toggle-btn" class="hidden lg:inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Grid Aspect Ratio">
@@ -627,6 +632,8 @@
         filter_all: 'Все',
         filter_photos: 'Фото',
         filter_videos: 'Видео',
+        filter_favorites_title: 'Только избранное',
+        no_fav_albums: 'Избранных кадров пока нет',
         video_transcode_title: 'Требуется перекодирование',
         video_transcode_desc: 'Формат контейнера (MKV/AVI) требует перекодирования в веб-формат (1080p MP4) для плавного просмотра.',
         video_transcode_btn: 'Перекодировать для просмотра',
@@ -762,6 +769,8 @@
         filter_all: 'All',
         filter_photos: 'Photos',
         filter_videos: 'Videos',
+        filter_favorites_title: 'Favorites only',
+        no_fav_albums: 'No favorites yet',
         video_transcode_title: 'Transcoding Required',
         video_transcode_desc: 'This container format (MKV/AVI) requires transcoding to web-friendly MP4 (1080p) for smooth browser playback.',
         video_transcode_btn: 'Transcode for Playback',
@@ -932,6 +941,10 @@
         const key = el.getAttribute('data-i18n-placeholder');
         el.placeholder = t(key);
       });
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const key = el.getAttribute('data-i18n-title');
+        el.title = t(key);
+      });
       updateRatioButtonLabel();
       renderLibrarySwitcher();
       if (allYears.length) {
@@ -1061,6 +1074,24 @@
       btnAll.className = currentMediaTypeFilter === 'all' ? activeClasses : inactiveClasses;
       btnPhoto.className = currentMediaTypeFilter === 'photo' ? activeClasses : inactiveClasses;
       btnVideo.className = currentMediaTypeFilter === 'video' ? activeClasses : inactiveClasses;
+    }
+
+    function toggleGlobalFavoritesFilter() {
+      setFavoritesFilter(!showOnlyFavorites);
+    }
+
+    function updateFavoritesFilterUI() {
+      const btn = document.getElementById('btn-media-fav');
+      const icon = document.getElementById('btn-media-fav-icon');
+      if (!btn || !icon) return;
+      btn.setAttribute('aria-pressed', showOnlyFavorites ? 'true' : 'false');
+      if (showOnlyFavorites) {
+        btn.className = 'inline-flex items-center justify-center border border-red-500 bg-red-500 text-white p-1.5 transition';
+        icon.setAttribute('fill', 'currentColor');
+      } else {
+        btn.className = 'inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-600 dark:text-stone-400 transition';
+        icon.setAttribute('fill', 'none');
+      }
     }
 
     function toggleSidebarCollapse() {
@@ -1200,7 +1231,9 @@
       if (libId === currentLibraryId && currentAlbumPath === '') return;
       currentLibraryId = libId;
       currentMediaTypeFilter = 'all';
+      showOnlyFavorites = false;
       updateMediaTypeFilterUI();
+      updateFavoritesFilterUI();
       localStorage.setItem('pixie_library', libId);
       currentAlbumPath = '';
       currentAlbumYear = '';
@@ -1285,14 +1318,25 @@
       updateLibraryTotalsSummary();
     }
 
+    function getAlbumMediaCounts(album) {
+      const photos = showOnlyFavorites
+        ? (album.fav_photo_count || 0)
+        : (album.photo_count ?? album.count ?? 0);
+      const videos = showOnlyFavorites
+        ? (album.fav_video_count || 0)
+        : (album.video_count || 0);
+      return { photos, videos, total: photos + videos };
+    }
+
     function albumMatchesMediaFilter(album) {
+      const counts = getAlbumMediaCounts(album);
       if (currentMediaTypeFilter === 'photo') {
-        return album.photo_count === undefined ? (album.count || 0) > 0 : album.photo_count > 0;
+        return counts.photos > 0;
       }
       if (currentMediaTypeFilter === 'video') {
-        return !!(album.video_count && album.video_count > 0);
+        return counts.videos > 0;
       }
-      return true;
+      return showOnlyFavorites ? counts.total > 0 : true;
     }
 
     function getFilteredYears(selectedYear = 'ALL') {
@@ -1303,8 +1347,8 @@
     }
 
     function formatYearStats(albums) {
-      const yPhotos = currentMediaTypeFilter === 'video' ? 0 : albums.reduce((sum, a) => sum + (a.photo_count ?? a.count ?? 0), 0);
-      const yVideos = currentMediaTypeFilter === 'photo' ? 0 : albums.reduce((sum, a) => sum + (a.video_count || 0), 0);
+      const yPhotos = currentMediaTypeFilter === 'video' ? 0 : albums.reduce((sum, a) => sum + getAlbumMediaCounts(a).photos, 0);
+      const yVideos = currentMediaTypeFilter === 'photo' ? 0 : albums.reduce((sum, a) => sum + getAlbumMediaCounts(a).videos, 0);
       if (currentMediaTypeFilter === 'video') {
         return `${albums.length} ${t('year_folders_short')} • ${yVideos} ${t('videos_short')}`;
       }
@@ -1322,8 +1366,9 @@
         for (const a of y.albums) {
           if (q && !a.path.toLowerCase().includes(q)) continue;
           totalFolders++;
-          if (currentMediaTypeFilter !== 'video') totalPhotos += (a.photo_count ?? a.count ?? 0);
-          if (currentMediaTypeFilter !== 'photo') totalVideos += (a.video_count || 0);
+          const counts = getAlbumMediaCounts(a);
+          if (currentMediaTypeFilter !== 'video') totalPhotos += counts.photos;
+          if (currentMediaTypeFilter !== 'photo') totalVideos += counts.videos;
         }
       }
 
@@ -1344,7 +1389,7 @@
       const treeEl = document.getElementById('sidebar-tree');
       const filteredYears = getFilteredYears('ALL');
       if (!filteredYears.length) {
-        treeEl.innerHTML = `<p class="text-stone-400">${t('no_albums')}</p>`;
+        treeEl.innerHTML = `<p class="text-stone-400">${showOnlyFavorites ? t('no_fav_albums') : t('no_albums')}</p>`;
         updateLibraryTotalsSummary();
         return;
       }
@@ -1368,17 +1413,18 @@
                 if (isActive) textClasses = 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium';
                 if (a.is_hidden && !isActive) textClasses = 'text-red-600 dark:text-red-400 hover:bg-stone-100 dark:hover:bg-[#222]';
                 
-                let countBadge = `(${a.count})`;
+                const counts = getAlbumMediaCounts(a);
+                let countBadge = `(${counts.total})`;
                 if (currentMediaTypeFilter === 'photo') {
-                  countBadge = `(${a.photo_count ?? a.count})`;
+                  countBadge = `(${counts.photos})`;
                 } else if (currentMediaTypeFilter === 'video') {
-                  countBadge = `(${a.video_count || 0})`;
-                } else if (a.photo_count > 0 && a.video_count > 0) {
-                  countBadge = `(${a.photo_count} + ${a.video_count})`;
-                } else if (a.photo_count > 0) {
-                  countBadge = `(${a.photo_count})`;
-                } else if (a.video_count > 0) {
-                  countBadge = `(${a.video_count})`;
+                  countBadge = `(${counts.videos})`;
+                } else if (counts.photos > 0 && counts.videos > 0) {
+                  countBadge = `(${counts.photos} + ${counts.videos})`;
+                } else if (counts.photos > 0) {
+                  countBadge = `(${counts.photos})`;
+                } else if (counts.videos > 0) {
+                  countBadge = `(${counts.videos})`;
                 }
                 
                 return `
@@ -1400,7 +1446,7 @@
       const container = document.getElementById('years-container');
       const filtered = getFilteredYears(selectedYear);
       if (!filtered.length) {
-        container.innerHTML = `<p class="text-center text-stone-400 tracking-widest uppercase text-sm py-20">${t('no_albums')}</p>`;
+        container.innerHTML = `<p class="text-center text-stone-400 tracking-widest uppercase text-sm py-20">${showOnlyFavorites ? t('no_fav_albums') : t('no_albums')}</p>`;
         updateLibraryTotalsSummary();
         return;
       }
@@ -1417,11 +1463,12 @@
           </div>
           <div class="photo-grid">
             ${albums.map(album => {
-              let countText = `${album.count} ${album.video_count ? t('media_count') : t('photos_count')}`;
+              const counts = getAlbumMediaCounts(album);
+              let countText = `${counts.total} ${counts.videos ? t('media_count') : t('photos_count')}`;
               if (currentMediaTypeFilter === 'photo') {
-                countText = `${album.photo_count !== undefined ? album.photo_count : album.count} ${t('photos_count')}`;
+                countText = `${counts.photos} ${t('photos_count')}`;
               } else if (currentMediaTypeFilter === 'video') {
-                countText = `${album.video_count || 0} ${t('videos_count')}`;
+                countText = `${counts.videos} ${t('videos_count')}`;
               }
 
               return `
@@ -1429,10 +1476,10 @@
                 <div class="relative aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
                   <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                   <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
-                  ${album.video_count ? `
+                  ${counts.videos ? `
                     <div class="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium tracking-wider pointer-events-none">
                       <svg class="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                      <span>${album.video_count}</span>
+                      <span>${counts.videos}</span>
                     </div>
                   ` : ''}
                 </div>
@@ -1491,8 +1538,11 @@
 
     function updateAlbumHeaderCount() {
       if (!currentAlbumData) return;
-      const photos = currentAlbumData.photos.filter(p => p.media_type === 'photo');
-      const videos = currentAlbumData.photos.filter(p => p.media_type === 'video');
+      const source = showOnlyFavorites
+        ? currentAlbumData.photos.filter(p => p.is_favorite)
+        : currentAlbumData.photos;
+      const photos = source.filter(p => p.media_type === 'photo');
+      const videos = source.filter(p => p.media_type === 'video');
       
       const showPhotos = currentMediaTypeFilter === 'all' || currentMediaTypeFilter === 'photo';
       const showVideos = currentMediaTypeFilter === 'all' || currentMediaTypeFilter === 'video';
@@ -1548,7 +1598,6 @@
       const album = await res.json();
       currentPhotos = album.photos || [];
       currentAlbumYear = album.year;
-      showOnlyFavorites = false;
       currentAlbumData = album;
       document.getElementById('album-hero-img').src = album.cover || '';
       document.getElementById('album-year-label').textContent = album.year;
@@ -1623,8 +1672,20 @@
     }
 
     function setFavoritesFilter(onlyFavs) {
-      showOnlyFavorites = onlyFavs;
-      renderAlbumPhotos();
+      showOnlyFavorites = Boolean(onlyFavs);
+      updateFavoritesFilterUI();
+      renderSidebarTree(currentAlbumPath);
+      if (currentAlbumPath) {
+        renderAlbumPhotos();
+        updateAlbumHeaderCount();
+        renderSiblingNav();
+      } else {
+        renderYears('ALL');
+      }
+      const searchInput = document.getElementById('sidebar-search');
+      if (searchInput && searchInput.value) {
+        handleSearch(searchInput.value);
+      }
     }
 
     function getSortedPhotos(list) {
@@ -1738,11 +1799,11 @@
       displayedPhotos = getSortedPhotos(baseList);
 
       if (showOnlyFavorites) {
-        tabAll.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5 shadow-sm';
-        tabFav.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition';
-      } else {
         tabAll.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition';
         tabFav.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition inline-flex items-center gap-1.5 shadow-sm';
+      } else {
+        tabAll.className = 'px-4 py-2 bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 transition';
+        tabFav.className = 'px-4 py-2 border border-stone-300 dark:border-stone-700 text-stone-700 dark:text-stone-300 hover:border-stone-800 dark:hover:border-stone-300 transition inline-flex items-center gap-1.5';
       }
 
       if (favPhotos.length > 0) {
@@ -1819,6 +1880,17 @@
       const data = await res.json();
       const target = currentPhotos.find(p => p.path === decodedPath);
       if (target) target.is_favorite = data.is_favorite;
+      for (const y of allYears) {
+        const alb = y.albums.find(a => a.path === currentAlbumPath);
+        if (alb) {
+          alb.fav_photo_count = currentPhotos.filter(p => p.is_favorite && p.media_type !== 'video').length;
+          alb.fav_video_count = currentPhotos.filter(p => p.is_favorite && p.media_type === 'video').length;
+          alb.fav_count = alb.fav_photo_count + alb.fav_video_count;
+          break;
+        }
+      }
+      renderSidebarTree(currentAlbumPath);
+      updateAlbumHeaderCount();
       renderAlbumPhotos();
       const lb = document.getElementById('lightbox');
       if (!lb.classList.contains('hidden') && displayedPhotos[currentIndex]) {

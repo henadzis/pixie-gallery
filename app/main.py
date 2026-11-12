@@ -1281,7 +1281,8 @@ def scan_all_albums_recursive(
     hidden_folders: list,
     show_hidden: bool,
     lib_id: str = "default",
-    lib_root: Optional[Path] = None
+    lib_root: Optional[Path] = None,
+    user_favs: Optional[set] = None
 ) -> list:
     if lib_root is None:
         _, lib_root, _ = get_library_root(lib_id)
@@ -1323,6 +1324,17 @@ def scan_all_albums_recursive(
 
             photo_count = sum(1 for f in valid_items if f.suffix.lower() in SUPPORTED_IMAGE_EXTS)
             video_count = sum(1 for f in valid_items if f.suffix.lower() in SUPPORTED_VIDEO_EXTS)
+            fav_photo_count = 0
+            fav_video_count = 0
+            if user_favs:
+                for f in valid_items:
+                    rel_f = f.relative_to(lib_root).as_posix()
+                    fk = rel_f if lib_id == "default" else f"{lib_id}::{rel_f}"
+                    if fk in user_favs:
+                        if f.suffix.lower() in SUPPORTED_VIDEO_EXTS:
+                            fav_video_count += 1
+                        else:
+                            fav_photo_count += 1
 
             albums_flat.append({
                 "name": display_name,
@@ -1331,6 +1343,9 @@ def scan_all_albums_recursive(
                 "count": len(valid_items),
                 "photo_count": photo_count,
                 "video_count": video_count,
+                "fav_count": fav_photo_count + fav_video_count,
+                "fav_photo_count": fav_photo_count,
+                "fav_video_count": fav_video_count,
                 "cover": f"/api/thumb/400/{quote(cover_rel)}?lib={q_lib}",
                 "is_hidden": is_hidden
             })
@@ -1376,10 +1391,13 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
     active_id = active_lib["id"]
     _, active_root, _ = get_library_root(active_id, db)
 
+    user_favs = set(db.get("favorites", {}).get(user["username"], []))
+
     def _filter_years_for_lib(target_lib_id, target_root):
         raw = scan_all_albums_recursive(
             ex_exts, ex_masks, hidden_folders, show_hidden,
-            lib_id=target_lib_id, lib_root=target_root
+            lib_id=target_lib_id, lib_root=target_root,
+            user_favs=user_favs
         )
         f_years = []
         f_flat = []
