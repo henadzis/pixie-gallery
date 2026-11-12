@@ -925,11 +925,33 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
 
 def _format_libraries_response(db: dict, user: dict) -> list:
     libs = get_libraries_list(db)
+    ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
+    show_hidden = db.get("settings", {}).get("show_hidden_albums", False)
+    
     out = []
     for lib in libs:
         lid = lib.get("id", "default")
         if not user_can_access_library(user, lid):
             continue
+        
+        # Для пользователей проверяем, есть ли доступные альбомы
+        if user["role"] != "admin":
+            _, lib_root, _ = get_library_root(lid, db)
+            albums = scan_all_albums_recursive(
+                ex_exts, ex_masks, hidden_folders, show_hidden,
+                lib_id=lid, lib_root=lib_root
+            )
+            has_access = False
+            for y in albums:
+                for alb in y["albums"]:
+                    if user_can_access_album(user, alb["path"], lid):
+                        has_access = True
+                        break
+                if has_access:
+                    break
+            if not has_access:
+                continue
+
         raw_p = Path(lib.get("path", str(PHOTOS_DIR)))
         if lid == "default" and not raw_p.exists() and PHOTOS_DIR.exists():
             resolved_p = PHOTOS_DIR

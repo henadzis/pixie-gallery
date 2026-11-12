@@ -213,7 +213,10 @@
     <!-- САЙДБАР С ДЕРЕВОМ ПАПОК -->
     <aside id="sidebar" class="fixed md:static inset-y-0 left-0 transform -translate-x-full md:translate-x-0 flex-none w-80 bg-white dark:bg-[#161616] border-r border-stone-200 dark:border-stone-800 flex flex-col transition-all duration-300 z-40 md:z-20">
       <div class="p-4 border-b border-stone-200 dark:border-stone-800 flex items-center justify-between">
-        <span class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="sidebar_title">Структура диска</span>
+        <div>
+          <span class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500 block" data-i18n="sidebar_title">Структура диска</span>
+          <div id="sidebar-totals-summary" class="text-[11px] text-stone-400 mt-0.5"></div>
+        </div>
         <button onclick="toggleMobileSidebar()" class="md:hidden text-stone-400 hover:text-black dark:hover:text-white p-1">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -234,6 +237,7 @@
         <div class="mb-10">
           <h2 class="serif-title text-3xl md:text-5xl tracking-widest mb-2" data-i18n="home_title">Хроника архива</h2>
           <p class="text-xs tracking-[0.2em] uppercase text-stone-400" data-i18n="home_subtitle">Все альбомы и подпапки вашего архива</p>
+          <p id="home-totals-summary" class="text-xs tracking-[0.15em] text-stone-500 dark:text-stone-400 mt-2"></p>
         </div>
         <div id="years-container" class="space-y-16"></div>
       </div>
@@ -628,6 +632,11 @@
         video_transcode_btn: 'Перекодировать для просмотра',
         video_transcoding: 'Обработка через FFmpeg...',
         photos_upper: 'ФОТОГРАФИЙ',
+        videos_upper: 'ВИДЕО',
+        and_conj: 'И',
+        year_folders_short: 'пап.',
+        photos_short: 'фото',
+        videos_short: 'видео',
         download_album_zip: 'Скачать (ZIP)',
         hide_album: 'Скрыть',
         tab_all: 'Все кадры',
@@ -758,6 +767,11 @@
         video_transcode_btn: 'Transcode for Playback',
         video_transcoding: 'Processing with FFmpeg...',
         photos_upper: 'PHOTOS',
+        videos_upper: 'VIDEOS',
+        and_conj: 'AND',
+        year_folders_short: 'flds.',
+        photos_short: 'photos',
+        videos_short: 'videos',
         download_album_zip: 'Download (ZIP)',
         hide_album: 'Hide',
         tab_all: 'All Photos',
@@ -879,6 +893,7 @@
     let currentAlbumPathEncoded = '';
     let currentAlbumYear = '';
     let currentPhotos = [];
+    let currentAlbumData = null;
     let displayedPhotos = [];
     let showOnlyFavorites = false;
     let currentSort = localStorage.getItem('pixie_sort') || 'name_asc';
@@ -1020,10 +1035,17 @@
       currentMediaTypeFilter = type;
       localStorage.setItem('pixie_media_filter', type);
       updateMediaTypeFilterUI();
+      renderSidebarTree(currentAlbumPath);
       if (currentAlbumPath) {
         renderAlbumPhotos();
+        updateAlbumHeaderCount();
+        renderSiblingNav();
       } else {
         renderYears('ALL');
+      }
+      const searchInput = document.getElementById('sidebar-search');
+      if (searchInput && searchInput.value) {
+          handleSearch(searchInput.value);
       }
     }
 
@@ -1177,6 +1199,8 @@
       closeLibraryDropdown();
       if (libId === currentLibraryId && currentAlbumPath === '') return;
       currentLibraryId = libId;
+      currentMediaTypeFilter = 'all';
+      updateMediaTypeFilterUI();
       localStorage.setItem('pixie_library', libId);
       currentAlbumPath = '';
       currentAlbumYear = '';
@@ -1257,35 +1281,110 @@
         const visible = group.querySelectorAll('.home-album-card:not([style*="display: none"])');
         group.style.display = visible.length > 0 ? 'block' : 'none';
       });
+
+      updateLibraryTotalsSummary();
+    }
+
+    function albumMatchesMediaFilter(album) {
+      if (currentMediaTypeFilter === 'photo') {
+        return album.photo_count === undefined ? (album.count || 0) > 0 : album.photo_count > 0;
+      }
+      if (currentMediaTypeFilter === 'video') {
+        return !!(album.video_count && album.video_count > 0);
+      }
+      return true;
+    }
+
+    function getFilteredYears(selectedYear = 'ALL') {
+      const base = selectedYear === 'ALL' ? allYears : allYears.filter(y => y.year === selectedYear);
+      return base
+        .map(y => ({ year: y.year, albums: y.albums.filter(albumMatchesMediaFilter) }))
+        .filter(y => y.albums.length > 0);
+    }
+
+    function formatYearStats(albums) {
+      const yPhotos = currentMediaTypeFilter === 'video' ? 0 : albums.reduce((sum, a) => sum + (a.photo_count ?? a.count ?? 0), 0);
+      const yVideos = currentMediaTypeFilter === 'photo' ? 0 : albums.reduce((sum, a) => sum + (a.video_count || 0), 0);
+      if (currentMediaTypeFilter === 'video') {
+        return `${albums.length} ${t('year_folders_short')} • ${yVideos} ${t('videos_short')}`;
+      }
+      return `${albums.length} ${t('year_folders_short')} • ${yPhotos} ${t('photos_short')}` + (yVideos > 0 ? ` (+${yVideos} ${t('videos_short')})` : '');
+    }
+
+    function updateLibraryTotalsSummary() {
+      const q = (document.getElementById('sidebar-search')?.value || '').toLowerCase().trim();
+      const filteredYears = getFilteredYears('ALL');
+      let totalFolders = 0;
+      let totalPhotos = 0;
+      let totalVideos = 0;
+
+      for (const y of filteredYears) {
+        for (const a of y.albums) {
+          if (q && !a.path.toLowerCase().includes(q)) continue;
+          totalFolders++;
+          if (currentMediaTypeFilter !== 'video') totalPhotos += (a.photo_count ?? a.count ?? 0);
+          if (currentMediaTypeFilter !== 'photo') totalVideos += (a.video_count || 0);
+        }
+      }
+
+      let text = '';
+      if (currentMediaTypeFilter === 'video') {
+        text = `${totalFolders} ${t('year_folders_short')} • ${totalVideos} ${t('videos_short')}`;
+      } else {
+        text = `${totalFolders} ${t('year_folders_short')} • ${totalPhotos} ${t('photos_short')}` + (totalVideos > 0 ? ` (+${totalVideos} ${t('videos_short')})` : '');
+      }
+
+      const sidebarSummary = document.getElementById('sidebar-totals-summary');
+      if (sidebarSummary) sidebarSummary.textContent = text;
+      const homeSummary = document.getElementById('home-totals-summary');
+      if (homeSummary) homeSummary.textContent = text;
     }
 
     function renderSidebarTree(activePath = '') {
       const treeEl = document.getElementById('sidebar-tree');
-      if (!allYears.length) {
+      const filteredYears = getFilteredYears('ALL');
+      if (!filteredYears.length) {
         treeEl.innerHTML = `<p class="text-stone-400">${t('no_albums')}</p>`;
+        updateLibraryTotalsSummary();
         return;
       }
 
       let html = '';
-      for (const y of allYears) {
+      for (const y of filteredYears) {
+        const yAlbs = y.albums;
+        const yStats = formatYearStats(yAlbs);
+
         const escapedYear = y.year.replace(/'/g, "\\'");
         html += `
           <div class="space-y-1 sidebar-year-group">
             <button id="sidebar-${safeYearId(y.year)}" onclick="navigateToYear('${escapedYear}')" class="w-full text-left font-semibold text-stone-800 dark:text-stone-200 tracking-wider uppercase py-1.5 px-2 bg-stone-100 dark:bg-[#202020] hover:bg-stone-200 dark:hover:bg-[#2a2a2a] transition flex items-center justify-between rounded-sm">
               <span class="inline-flex items-center truncate">${SVG_ICONS.calendar}${y.year}</span>
-              <span class="text-[10px] opacity-50 font-normal">${y.albums.length}</span>
+              <span class="text-[10px] opacity-50 font-normal truncate ml-2">${yStats}</span>
             </button>
             <div class="pl-2 space-y-1 mt-1 border-l border-stone-200 dark:border-stone-800 ml-1.5">
-              ${y.albums.map(a => {
+              ${yAlbs.map(a => {
                 const isActive = a.path === activePath;
                 let textClasses = 'text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#222]';
                 if (isActive) textClasses = 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900 font-medium';
                 if (a.is_hidden && !isActive) textClasses = 'text-red-600 dark:text-red-400 hover:bg-stone-100 dark:hover:bg-[#222]';
                 
+                let countBadge = `(${a.count})`;
+                if (currentMediaTypeFilter === 'photo') {
+                  countBadge = `(${a.photo_count ?? a.count})`;
+                } else if (currentMediaTypeFilter === 'video') {
+                  countBadge = `(${a.video_count || 0})`;
+                } else if (a.photo_count > 0 && a.video_count > 0) {
+                  countBadge = `(${a.photo_count} + ${a.video_count})`;
+                } else if (a.photo_count > 0) {
+                  countBadge = `(${a.photo_count})`;
+                } else if (a.video_count > 0) {
+                  countBadge = `(${a.video_count})`;
+                }
+                
                 return `
                   <button id="sidebar-album-${encodeURIComponent(a.path)}" data-search="${a.path}" title="${a.path}" onclick="openAlbum('${encodeURIComponent(a.path)}'); if(window.innerWidth < 768) toggleMobileSidebar();" class="sidebar-album-btn w-full text-left px-2.5 py-1.5 transition truncate flex items-center justify-between rounded-sm ${textClasses}">
                     <span class="truncate inline-flex items-center">${SVG_ICONS.folder}${a.name}</span>
-                    <span class="opacity-50 text-[10px] ml-1 shrink-0">(${a.count})</span>
+                    <span class="opacity-50 text-[10px] ml-1 shrink-0">${countBadge}</span>
                   </button>
                 `;
               }).join('')}
@@ -1294,30 +1393,27 @@
         `;
       }
       treeEl.innerHTML = html;
+      updateLibraryTotalsSummary();
     }
 
     function renderYears(selectedYear) {
       const container = document.getElementById('years-container');
-      const filtered = selectedYear === 'ALL' ? allYears : allYears.filter(y => y.year === selectedYear);
+      const filtered = getFilteredYears(selectedYear);
       if (!filtered.length) {
         container.innerHTML = `<p class="text-center text-stone-400 tracking-widest uppercase text-sm py-20">${t('no_albums')}</p>`;
+        updateLibraryTotalsSummary();
         return;
       }
 
       container.innerHTML = filtered.map(yearObj => {
-        let albums = yearObj.albums;
-        if (currentMediaTypeFilter === 'photo') {
-          albums = albums.filter(a => a.photo_count === undefined || a.photo_count > 0);
-        } else if (currentMediaTypeFilter === 'video') {
-          albums = albums.filter(a => a.video_count && a.video_count > 0);
-        }
-        if (!albums.length) return '';
+        const albums = yearObj.albums;
+        const yearStats = formatYearStats(albums);
 
         return `
         <div id="${safeYearId(yearObj.year)}" class="home-year-group scroll-mt-24">
           <div class="flex items-baseline justify-between border-b border-stone-200 dark:border-stone-800 pb-4 mb-8">
             <h2 class="serif-title text-3xl md:text-4xl tracking-widest">${yearObj.year}</h2>
-            <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${albums.length} ${t('folders_count')}</span>
+            <span class="text-xs tracking-[0.2em] uppercase text-stone-400">${yearStats}</span>
           </div>
           <div class="photo-grid">
             ${albums.map(album => {
@@ -1393,11 +1489,26 @@
       }
     }
 
+    function updateAlbumHeaderCount() {
+      if (!currentAlbumData) return;
+      const photos = currentAlbumData.photos.filter(p => p.media_type === 'photo');
+      const videos = currentAlbumData.photos.filter(p => p.media_type === 'video');
+      
+      const showPhotos = currentMediaTypeFilter === 'all' || currentMediaTypeFilter === 'photo';
+      const showVideos = currentMediaTypeFilter === 'all' || currentMediaTypeFilter === 'video';
+      
+      const parts = [];
+      if (showPhotos && photos.length > 0) parts.push(`${photos.length} ${t('photos_upper')}`);
+      if (showVideos && videos.length > 0) parts.push(`${videos.length} ${t('videos_upper')}`);
+      
+      const fallback = currentMediaTypeFilter === 'video' ? `0 ${t('videos_upper')}` : `0 ${t('photos_upper')}`;
+      document.getElementById('album-count').textContent = parts.join(` ${t('and_conj')} `) || fallback;
+    }
+
     function renderSiblingNav() {
-      const prevBtn = document.getElementById('nav-prev-btn');
-      const nextBtn = document.getElementById('nav-next-btn');
-      const catalog = (siblingAlbumsCatalog && siblingAlbumsCatalog.length > 0) ? siblingAlbumsCatalog : allAlbumsCatalog;
-      if (!catalog || catalog.length === 0) return;
+      const prevBtn = document.getElementById('nav-prev-album');
+      const nextBtn = document.getElementById('nav-next-album');
+      const catalog = getFilteredYears('ALL').flatMap(y => y.albums);
 
       const idx = catalog.findIndex(a => a.path === currentAlbumPath);
       
@@ -1438,10 +1549,11 @@
       currentPhotos = album.photos || [];
       currentAlbumYear = album.year;
       showOnlyFavorites = false;
+      currentAlbumData = album;
       document.getElementById('album-hero-img').src = album.cover || '';
       document.getElementById('album-year-label').textContent = album.year;
       document.getElementById('album-title').textContent = album.name || album.path;
-      document.getElementById('album-count').textContent = `${album.count} ${t('photos_upper')}`;
+      updateAlbumHeaderCount();
 
       const zipBtn = document.getElementById('album-zip-btn');
       if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
@@ -1475,6 +1587,14 @@
         homeView.classList.remove('hidden');
         albumView.classList.add('hidden');
         renderSidebarTree('');
+        
+        // Add summary to home subtitle
+        const subtitle = homeView.querySelector('p[data-i18n="home_subtitle"]');
+        if (subtitle) {
+            const visibleAlbs = Array.from(document.querySelectorAll('.home-album-card')).filter(el => el.style.display !== 'none');
+            subtitle.textContent = `Доступно: ${visibleAlbs.length} папок`;
+        }
+
         if (clearHash) setHashSilently('');
 
         if (yearToScroll) {
@@ -2241,14 +2361,26 @@
       }
     }
 
+    function syncStarCheckboxGroup(selector, changedEl) {
+      const allCbs = Array.from(document.querySelectorAll(selector));
+      const starCb = allCbs.find(cb => cb.value === '*');
+      const itemCbs = allCbs.filter(cb => cb.value !== '*');
+      if (!starCb) return;
+      if (changedEl.value === '*') {
+        itemCbs.forEach(cb => { cb.checked = changedEl.checked; });
+      } else {
+        starCb.checked = itemCbs.length > 0 && itemCbs.every(cb => cb.checked);
+      }
+    }
+
     function renderLibraryCheckboxes(selectedLibs = ['*'], selectedDefaultLib = '') {
       const box = document.getElementById('libraries-checkbox-list');
       if (!box) return;
       const isAll = selectedLibs.includes('*');
-      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAll ? 'checked' : ''} class="lib-cb accent-stone-900 dark:accent-stone-100" /><span>★ ${t('all_libs_star')}</span></label>`;
+      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAll ? 'checked' : ''} onchange="syncStarCheckboxGroup('.lib-cb', this)" class="lib-cb accent-stone-900 dark:accent-stone-100" /><span>★ ${t('all_libs_star')}</span></label>`;
       for (const lib of adminLibraries) {
         const isChecked = isAll || selectedLibs.includes(lib.id);
-        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${lib.id}" ${isChecked ? 'checked' : ''} class="lib-cb accent-stone-900 dark:accent-stone-100" /><span class="truncate" title="${lib.path}">${lib.name}</span></label>`;
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${lib.id}" ${isChecked ? 'checked' : ''} onchange="syncStarCheckboxGroup('.lib-cb', this)" class="lib-cb accent-stone-900 dark:accent-stone-100" /><span class="truncate" title="${lib.path}">${lib.name}</span></label>`;
       }
       box.innerHTML = html;
 
@@ -2388,11 +2520,11 @@
 
       const multiLibs = adminLibraries && adminLibraries.length > 1;
       const isAllChecked = selectedAlbums.includes('*');
-      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAllChecked ? 'checked' : ''} onchange="toggleAllAlbumsCheckbox(this)" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
+      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAllChecked ? 'checked' : ''} onchange="syncStarCheckboxGroup('.album-cb', this)" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
       for (const a of allAlbumsCatalog) {
         const isChecked = isAllChecked || selectedAlbums.includes(a.path);
         const displayName = (multiLibs && a.lib_name) ? `[${a.lib_name}] ${a.name || a.path}` : (a.name || a.path);
-        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${displayName}</span></label>`;
+        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} onchange="syncStarCheckboxGroup('.album-cb', this)" class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${displayName}</span></label>`;
       }
       box.innerHTML = html;
     }
@@ -2485,9 +2617,11 @@
       const password = document.getElementById('new-u-pass').value;
       const role = document.getElementById('new-u-role').value;
       const mode = currentUserEditMode;
-      const checked = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
-      const checkedLibs = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
-      const allowedLibraries = (role === 'admin' || checkedLibs.includes('*') || checkedLibs.length === 0) ? ['*'] : checkedLibs;
+      const checkedRaw = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
+      const checked = checkedRaw.includes('*') ? ['*'] : checkedRaw.filter(v => v !== '*');
+      const checkedLibsRaw = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
+      const specificLibs = checkedLibsRaw.filter(v => v !== '*');
+      const allowedLibraries = (role === 'admin' || checkedLibsRaw.includes('*') || specificLibs.length === 0) ? ['*'] : specificLibs;
       const defLib = document.getElementById('new-u-default-lib')?.value || null;
 
       const res = await fetch('/api/users', {
