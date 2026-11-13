@@ -2100,8 +2100,9 @@
     }
 
     function renderSiblingNav() {
-      const prevBtn = document.getElementById('nav-prev-album');
-      const nextBtn = document.getElementById('nav-next-album');
+      const prevBtn = document.getElementById('nav-prev-btn');
+      const nextBtn = document.getElementById('nav-next-btn');
+      if (!prevBtn || !nextBtn) return;
       const catalog = getFilteredYears('ALL').flatMap(y => y.albums);
 
       const idx = catalog.findIndex(a => a.path === currentAlbumPath);
