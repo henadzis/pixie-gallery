@@ -39,6 +39,8 @@ DEFAULT_EXCLUDE_MASKS = os.getenv(
     "*_small.*, *_smal.*, *_thumb.*, ._*"
 )
 
+DEFAULT_VIDEO_CACHE_MAX_GB = max(0.0, float(os.getenv("VIDEO_CACHE_MAX_GB", "5")))
+
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_CACHE_DIR = CACHE_DIR / "transcoded"
 VIDEO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
@@ -71,6 +73,7 @@ pregen_status = {
 pregen_lock = threading.Lock()
 db_lock = threading.Lock()
 exif_lock = threading.Lock()
+cleanup_lock = threading.Lock()
 thumb_semaphore = threading.Semaphore(2)
 
 MAX_EXIF_CACHE_SIZE = 1000
@@ -96,6 +99,7 @@ def default_settings_dict() -> dict:
         "exclude_masks": DEFAULT_EXCLUDE_MASKS,
         "hidden_folders": "",
         "show_hidden_albums": False,
+        "video_cache_max_gb": DEFAULT_VIDEO_CACHE_MAX_GB,
         "libraries": default_libraries_list()
     }
 
@@ -698,6 +702,10 @@ def transcode_video_worker(orig_path: Path, output_file: Path, transcode_id: str
             temp_output.replace(output_file)
             with video_transcode_lock:
                 video_transcode_status[transcode_id] = {"status": "ready", "progress": 100}
+            try:
+                cleanup_cache_task(include_orphans=False)
+            except Exception:
+                pass
         else:
             with video_transcode_lock:
                 err_msg = proc.stderr[-300:] if proc.stderr else "FFmpeg transcode failed"
@@ -812,6 +820,7 @@ class SettingsUpdateRequest(BaseModel):
     exclude_masks: str = ""
     hidden_folders: str = ""
     show_hidden_albums: bool = False
+    video_cache_max_gb: Optional[float] = None
 
 
 class LibraryUpsertRequest(BaseModel):
@@ -909,6 +918,8 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         raise HTTPException(status_code=403, detail="Admin only")
     db = load_db()
     existing_libs = get_libraries_list(db)
+    prev_max_gb = db.get("settings", {}).get("video_cache_max_gb", DEFAULT_VIDEO_CACHE_MAX_GB)
+    video_cache_max_gb = prev_max_gb if req.video_cache_max_gb is None else max(0.0, float(req.video_cache_max_gb))
     db["settings"] = {
         "gallery_title": req.gallery_title.strip(),
         "show_exif": req.show_exif,
@@ -917,6 +928,7 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         "exclude_masks": req.exclude_masks.strip(),
         "hidden_folders": req.hidden_folders.strip(),
         "show_hidden_albums": req.show_hidden_albums,
+        "video_cache_max_gb": video_cache_max_gb,
         "libraries": existing_libs
     }
     save_db(db)
@@ -1015,7 +1027,7 @@ def save_library(req: LibraryUpsertRequest, user: dict = Depends(get_current_use
 
 
 @app.delete("/api/libraries/{lib_id}")
-def delete_library(lib_id: str, user: dict = Depends(get_current_user)):
+def delete_library(lib_id: str, background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
     if user["role"] != "admin":
         raise HTTPException(status_code=403, detail="Admin only")
     db = load_db()
@@ -1027,6 +1039,7 @@ def delete_library(lib_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="Library not found")
     db.setdefault("settings", {})["libraries"] = new_libs
     save_db(db)
+    background_tasks.add_task(cleanup_cache_task, True)
     return {"status": "ok", "libraries": _format_libraries_response(db, user)}
 
 
@@ -1063,6 +1076,231 @@ def clear_cache(user: dict = Depends(get_current_user)):
 
     gc.collect()
     return {"status": "ok", "deleted_files": count}
+
+
+def get_cache_size_breakdown() -> dict:
+    """Calculate total cache size and breakdown between thumbnails and transcoded videos."""
+    total_bytes = 0
+    thumbs_bytes = 0
+    video_bytes = 0
+    if CACHE_DIR.exists():
+        for dirpath, _, filenames in os.walk(CACHE_DIR):
+            dp = Path(dirpath)
+            is_video_dir = dp == VIDEO_CACHE_DIR or VIDEO_CACHE_DIR in dp.parents
+            for f in filenames:
+                fp = os.path.join(dirpath, f)
+                if os.path.islink(fp) or f == "config_db.json":
+                    continue
+                try:
+                    sz = os.path.getsize(fp)
+                except Exception:
+                    continue
+                total_bytes += sz
+                if is_video_dir:
+                    video_bytes += sz
+                elif f.endswith(".webp"):
+                    thumbs_bytes += sz
+    return {
+        "cache_size_bytes": total_bytes,
+        "thumbs_size_bytes": thumbs_bytes,
+        "video_cache_size_bytes": video_bytes,
+    }
+
+
+def _collect_valid_cache_keys(db: dict) -> tuple[bool, set[str], set[str], dict[str, int]]:
+    """Walk all configured libraries and collect valid thumbnail names, video names, and mtimes."""
+    libs = get_libraries_list(db)
+    valid_thumbs: set[str] = set()
+    valid_videos: set[str] = set()
+    valid_paths_mtime: dict[str, int] = {}
+
+    for lib in libs:
+        lid = lib.get("id", "default")
+        try:
+            _, lib_root, _ = get_library_root(lid, db)
+        except Exception:
+            return False, valid_thumbs, valid_videos, valid_paths_mtime
+        if not lib_root.exists() or not lib_root.is_dir():
+            return False, valid_thumbs, valid_videos, valid_paths_mtime
+
+        for root, dirs, files in os.walk(lib_root):
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+            for f in files:
+                if f.startswith("._"):
+                    continue
+                p = Path(root) / f
+                ext = p.suffix.lower()
+                if ext not in SUPPORTED_MEDIA_EXTS:
+                    continue
+                try:
+                    st = p.stat()
+                except Exception:
+                    continue
+                p_str = str(p)
+                valid_paths_mtime[p_str] = int(st.st_mtime)
+                for sz in (400, 1200):
+                    ck = f"{p_str}_{st.st_mtime}_{sz}".encode("utf-8")
+                    valid_thumbs.add(f"{hashlib.md5(ck).hexdigest()}_{sz}.webp")
+                if ext in SUPPORTED_TRANSCODE_VIDEO_EXTS:
+                    vck = f"{p_str}_{st.st_mtime}_1080p_v1".encode("utf-8")
+                    valid_videos.add(f"{hashlib.md5(vck).hexdigest()}.mp4")
+
+    return True, valid_thumbs, valid_videos, valid_paths_mtime
+
+
+def _cleanup_stale_metadata(valid_paths_mtime: dict[str, int]) -> int:
+    """Remove stale entries from EXIF and video metadata caches."""
+    removed = 0
+    exif_cache = load_exif_cache()
+    with exif_lock:
+        stale_keys = [
+            k for k, v in exif_cache.items()
+            if k not in valid_paths_mtime or v.get("mtime") != valid_paths_mtime[k]
+        ]
+        for k in stale_keys:
+            exif_cache.pop(k, None)
+        removed += len(stale_keys)
+    if stale_keys:
+        save_exif_cache()
+
+    video_cache = load_video_meta_cache()
+    with video_meta_lock:
+        stale_vkeys = [
+            k for k, v in video_cache.items()
+            if k not in valid_paths_mtime or v.get("mtime") != valid_paths_mtime[k]
+        ]
+        for k in stale_vkeys:
+            video_cache.pop(k, None)
+        removed += len(stale_vkeys)
+    if stale_vkeys:
+        save_video_meta_cache()
+    return removed
+
+
+def cleanup_cache_task(include_orphans: bool = True) -> dict:
+    """Remove broken temp files, orphaned cache files/metadata, and enforce video LRU size limit."""
+    with cleanup_lock:
+        db = load_db()
+        max_gb = float(db.get("settings", {}).get("video_cache_max_gb", DEFAULT_VIDEO_CACHE_MAX_GB))
+        max_bytes = int(max_gb * (1024 ** 3)) if max_gb > 0 else 0
+
+        deleted_thumbs = 0
+        deleted_videos = 0
+        deleted_tmp = 0
+        deleted_meta = 0
+        freed_bytes = 0
+        orphans_skipped = False
+
+        with video_transcode_lock:
+            active_ids = {
+                tid for tid, st in video_transcode_status.items()
+                if st.get("status") == "processing"
+            }
+
+        now = time.time()
+        if VIDEO_CACHE_DIR.exists():
+            for fp in list(VIDEO_CACHE_DIR.iterdir()):
+                if not fp.is_file() or fp.is_symlink():
+                    continue
+                if fp.name.endswith(".tmp.mp4"):
+                    tid = fp.name[:-8]
+                    try:
+                        st = fp.stat()
+                        if tid not in active_ids and (now - st.st_mtime) > 60:
+                            fp.unlink()
+                            deleted_tmp += 1
+                            freed_bytes += st.st_size
+                    except Exception:
+                        pass
+
+        if include_orphans:
+            all_libs_ok, valid_thumbs, valid_videos, valid_paths_mtime = _collect_valid_cache_keys(db)
+            if not all_libs_ok:
+                orphans_skipped = True
+            else:
+                if CACHE_DIR.exists():
+                    for entry in CACHE_DIR.iterdir():
+                        if not entry.is_dir() or entry == VIDEO_CACHE_DIR or len(entry.name) != 2:
+                            continue
+                        for fp in list(entry.iterdir()):
+                            if not fp.is_file() or fp.is_symlink() or not fp.name.endswith(".webp"):
+                                continue
+                            if fp.name not in valid_thumbs:
+                                try:
+                                    sz = fp.stat().st_size
+                                    fp.unlink()
+                                    deleted_thumbs += 1
+                                    freed_bytes += sz
+                                except Exception:
+                                    pass
+                        try:
+                            if not any(entry.iterdir()):
+                                entry.rmdir()
+                        except Exception:
+                            pass
+
+                if VIDEO_CACHE_DIR.exists():
+                    for fp in list(VIDEO_CACHE_DIR.iterdir()):
+                        if not fp.is_file() or fp.is_symlink() or not fp.name.endswith(".mp4") or fp.name.endswith(".tmp.mp4"):
+                            continue
+                        tid = fp.stem
+                        if fp.name not in valid_videos and tid not in active_ids:
+                            try:
+                                sz = fp.stat().st_size
+                                fp.unlink()
+                                deleted_videos += 1
+                                freed_bytes += sz
+                            except Exception:
+                                pass
+
+                deleted_meta = _cleanup_stale_metadata(valid_paths_mtime)
+
+        if max_bytes > 0 and VIDEO_CACHE_DIR.exists():
+            video_files = []
+            total_video_bytes = 0
+            for fp in VIDEO_CACHE_DIR.iterdir():
+                if not fp.is_file() or fp.is_symlink() or not fp.name.endswith(".mp4") or fp.name.endswith(".tmp.mp4"):
+                    continue
+                if fp.stem in active_ids:
+                    continue
+                try:
+                    st = fp.stat()
+                    total_video_bytes += st.st_size
+                    video_files.append((st.st_mtime, st.st_size, fp))
+                except Exception:
+                    pass
+
+            if total_video_bytes > max_bytes:
+                video_files.sort(key=lambda x: x[0])
+                for _, sz, fp in video_files:
+                    if total_video_bytes <= max_bytes:
+                        break
+                    try:
+                        fp.unlink()
+                        total_video_bytes -= sz
+                        deleted_videos += 1
+                        freed_bytes += sz
+                    except Exception:
+                        pass
+
+        gc.collect()
+        return {
+            "status": "ok",
+            "deleted_thumbs": deleted_thumbs,
+            "deleted_videos": deleted_videos,
+            "deleted_tmp": deleted_tmp,
+            "deleted_meta_entries": deleted_meta,
+            "freed_bytes": freed_bytes,
+            "orphans_skipped": orphans_skipped,
+            **get_cache_size_breakdown(),
+        }
+
+
+@app.post("/api/cache/optimize")
+def optimize_cache(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    return cleanup_cache_task(include_orphans=True)
 
 
 @app.get("/api/users")
@@ -1268,19 +1506,8 @@ def cancel_pregenerate(user: dict = Depends(get_current_user)):
 
 @app.get("/api/pregenerate/status")
 def get_pregenerate_status(user: dict = Depends(get_current_user)):
-    cache_size_bytes = 0
-    if CACHE_DIR.exists():
-        for dirpath, dirnames, filenames in os.walk(CACHE_DIR):
-            for f in filenames:
-                fp = os.path.join(dirpath, f)
-                if not os.path.islink(fp) and f != "config_db.json":
-                    try:
-                        cache_size_bytes += os.path.getsize(fp)
-                    except Exception:
-                        pass
-
     res = pregen_status.copy()
-    res["cache_size_bytes"] = cache_size_bytes
+    res.update(get_cache_size_breakdown())
     return res
 
 
@@ -1780,6 +2007,10 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
         hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
         transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
         if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+            try:
+                os.utime(transcoded_file, None)
+            except Exception:
+                pass
             target_stream_file = transcoded_file
             media_type = "video/mp4"
         else:

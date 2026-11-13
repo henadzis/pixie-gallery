@@ -84,6 +84,77 @@
       transition: none !important;
       cursor: grabbing !important;
     }
+
+    .pixie-tip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+    }
+    .pixie-tip-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 600;
+      line-height: 1;
+      border: 1px solid currentColor;
+      opacity: 0.6;
+      cursor: pointer;
+      transition: opacity 0.15s ease;
+      user-select: none;
+    }
+    .pixie-tip-btn:hover,
+    .pixie-tip.open .pixie-tip-btn {
+      opacity: 1;
+    }
+    .pixie-tip-box {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 8px);
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: min(260px, calc(100vw - 2.5rem));
+      padding: 8px 10px;
+      font-size: 11px;
+      line-height: 1.4;
+      font-weight: 400;
+      text-transform: none;
+      letter-spacing: normal;
+      background: #1c1917;
+      color: #f5f5f4;
+      border: 1px solid #44403c;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+      z-index: 70;
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.15s ease;
+    }
+    .dark .pixie-tip-box {
+      background: #292524;
+      color: #f5f5f4;
+      border-color: #57534e;
+    }
+    .pixie-tip:hover .pixie-tip-box,
+    .pixie-tip:focus-within .pixie-tip-box,
+    .pixie-tip.open .pixie-tip-box {
+      opacity: 1;
+      visibility: visible;
+    }
+    .settings-tab-btn.active {
+      background: #1c1917;
+      color: #ffffff;
+      border-color: #1c1917;
+    }
+    .dark .settings-tab-btn.active {
+      background: #f5f5f4;
+      color: #1c1917;
+      border-color: #f5f5f4;
+    }
   </style>
 </head>
 <body id="body-tag" class="font-montserrat h-screen flex flex-col overflow-hidden bg-[#f0eee9] text-[#1c1c1c] dark:bg-[#0a0a0a] dark:text-[#e0e0e0] transition-colors duration-300 selection:bg-stone-300 dark:selection:bg-stone-700">
@@ -460,221 +531,432 @@
   </div>
 
   <!-- МОДАЛЬНОЕ ОКНО НАСТРОЕК -->
-  <div id="settings-modal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-2xl w-full max-h-[92vh] overflow-y-auto p-6 md:p-8 shadow-xl space-y-8">
-      <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 pb-4">
-        <h2 class="serif-title text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки интерфейса</h2>
+  <div id="settings-modal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-xs flex items-center justify-center sm:p-4">
+    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-4xl w-full h-[100dvh] sm:h-[85vh] sm:max-h-[85vh] flex flex-col shadow-xl overflow-hidden">
+      <!-- Шапка модального окна -->
+      <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 px-5 py-4 shrink-0">
+        <h2 class="serif-title text-xl sm:text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки</h2>
         <button onclick="closeSettingsModal()" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
 
-      <div class="space-y-4">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_appearance">Оформление и сетка</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gallery_name">Заголовок галереи (название)</label>
-            <div class="flex gap-2">
-              <input id="pref-gallery-title" type="text" class="flex-grow border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-              <button onclick="saveGalleryTitleOnly()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+      <!-- Основная область: сайдбар (десктоп) / горизонтальные табы (мобильные) + контент -->
+      <div class="flex-1 flex flex-col md:flex-row min-h-0 min-w-0 overflow-hidden">
+        <nav class="flex md:flex-col gap-1.5 px-4 py-3 md:p-4 border-b md:border-b-0 md:border-r border-stone-200 dark:border-stone-800 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto md:w-52 shrink-0 min-w-0 bg-stone-50/70 dark:bg-[#141414]">
+          <button type="button" data-settings-tab="appearance" onclick="switchSettingsTab('appearance')" class="settings-tab-btn active whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            <span data-i18n="tab_appearance">Оформление</span>
+          </button>
+          <button type="button" data-settings-tab="viewing" onclick="switchSettingsTab('viewing')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span data-i18n="tab_viewing">Просмотр</span>
+          </button>
+          <button type="button" data-settings-tab="libraries" onclick="switchSettingsTab('libraries')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span data-i18n="tab_libraries_only">Библиотеки</span>
+          </button>
+          <button type="button" data-settings-tab="filters" onclick="switchSettingsTab('filters')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span data-i18n="tab_filters">Фильтры</span>
+          </button>
+          <button type="button" data-settings-tab="maintenance" onclick="switchSettingsTab('maintenance')" class="settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+            <span data-i18n="tab_maintenance">Обслуживание</span>
+          </button>
+          <button type="button" data-settings-tab="users" onclick="switchSettingsTab('users')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span data-i18n="tab_users">Пользователи</span>
+          </button>
+        </nav>
+
+        <div class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-5 md:p-6 space-y-6">
+          <!-- ВКЛАДКА 1: ОФОРМЛЕНИЕ -->
+          <div id="settings-panel-appearance" class="settings-tab-panel space-y-4">
+            <div class="space-y-4">
+              <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_appearance">Оформление и сетка</h3>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+                  <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gallery_name">Заголовок галереи (название)</label>
+                  <div class="flex gap-2 min-w-0">
+                    <input id="pref-gallery-title" type="text" class="flex-grow min-w-0 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                    <button onclick="saveGalleryTitleOnly()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+                  </div>
+                  <span id="title-saved-msg" class="text-xs text-green-600 hidden mt-1" data-i18n="msg_saved">✓ Сохранено</span>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                  <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_theme">Цветовая тема</label>
+                  <select id="pref-theme" onchange="changeTheme(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="light" data-i18n="theme_light">Светлая</option>
+                    <option value="dark" data-i18n="theme_dark">Темная</option>
+                  </select>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                  <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_font">Шрифт</label>
+                  <select id="pref-font" onchange="changeFont(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="montserrat">Montserrat</option>
+                    <option value="inter">Inter</option>
+                    <option value="garamond">Garamond</option>
+                  </select>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                  <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gap">Отступы между миниатюрами</label>
+                  <select id="pref-gap" onchange="changeGridGap(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="small" data-i18n="gap_small">Маленький</option>
+                    <option value="medium" data-i18n="gap_medium">Средний</option>
+                    <option value="large" data-i18n="gap_large">Большой</option>
+                  </select>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                  <label class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider mb-2">
+                    <span data-i18n="settings_ratio">Пропорции фото в сетке</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_ratio">«Без обрезки» сохраняет оригинальное соотношение сторон (justified сетка), «Ровная плитка» обрезает миниатюры до 4:3.</span>
+                    </span>
+                  </label>
+                  <select id="pref-ratio" onchange="changeGridRatio(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="original" data-i18n="ratio_original">Без обрезки (оригинальные)</option>
+                    <option value="crop" data-i18n="ratio_crop">Ровная плитка (4:3)</option>
+                  </select>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+                  <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="nav_language">Язык</label>
+                  <select id="pref-lang" onchange="changeLanguage(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <span id="title-saved-msg" class="text-xs text-green-600 hidden mt-1" data-i18n="msg_saved">✓ Сохранено</span>
-          </div>
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_theme">Цветовая тема</label>
-            <select id="pref-theme" onchange="changeTheme(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="light" data-i18n="theme_light">Светлая</option>
-              <option value="dark" data-i18n="theme_dark">Темная</option>
-            </select>
-          </div>
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_font">Шрифт</label>
-            <select id="pref-font" onchange="changeFont(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="montserrat">Montserrat</option>
-              <option value="inter">Inter</option>
-              <option value="garamond">Garamond</option>
-            </select>
-          </div>
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gap">Отступы между миниатюрами</label>
-            <select id="pref-gap" onchange="changeGridGap(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="small" data-i18n="gap_small">Маленький</option>
-              <option value="medium" data-i18n="gap_medium">Средний</option>
-              <option value="large" data-i18n="gap_large">Большой</option>
-            </select>
-          </div>
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_ratio">Пропорции фото в сетке</label>
-            <select id="pref-ratio" onchange="changeGridRatio(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="original" data-i18n="ratio_original">Без обрезки (оригинальные)</option>
-              <option value="crop" data-i18n="ratio_crop">Ровная плитка (4:3)</option>
-            </select>
-          </div>
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
-            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="nav_language">Язык</label>
-            <select id="pref-lang" onchange="changeLanguage(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="ru">Русский</option>
-              <option value="en">English</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_favorites">Избранное</h3>
-        <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800">
-          <div>
-            <div class="text-sm font-medium" data-i18n="clear_fav_title">Очистить список избранного</div>
-            <div class="text-xs text-stone-500" data-i18n="clear_fav_desc">Снять отметку «Избранное» со всех ваших фото и видео</div>
-          </div>
-          <div class="flex items-center gap-3">
-            <span id="fav-cleared-msg" class="text-xs text-green-600 hidden" data-i18n="msg_fav_cleared">✓ Избранное очищено</span>
-            <button type="button" onclick="clearAllFavorites()" class="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_clear_fav">Очистить избранное</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_view_params">Параметры просмотра и загрузки</h3>
-        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
-          <div>
-            <div class="text-sm font-medium" data-i18n="opt_exif_title">Отображать параметры съемки (EXIF)</div>
-            <div class="text-xs text-stone-500" data-i18n="opt_exif_desc">Камера, объектив, диафрагма, выдержка, ISO</div>
-          </div>
-          <input id="opt-show-exif" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100" />
-        </label>
-        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
-          <div>
-            <div class="text-sm font-medium" data-i18n="opt_zip_title">Разрешить скачивание альбомов ZIP</div>
-            <div class="text-xs text-stone-500" data-i18n="opt_zip_desc">Кнопки загрузки архивов для клиентов</div>
-          </div>
-          <input id="opt-allow-zip" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100" />
-        </label>
-        <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
-          <div>
-            <div class="text-sm font-medium text-red-600 dark:text-red-400" data-i18n="opt_show_hidden_title">Показывать скрытые альбомы</div>
-            <div class="text-xs text-stone-500" data-i18n="opt_show_hidden_desc">Отображать скрытые альбомы в галерее (выделяются цветом)</div>
-          </div>
-          <input id="opt-show-hidden" type="checkbox" onchange="saveGlobalSettings(true)" class="w-5 h-5 accent-red-600 dark:accent-red-500" />
-        </label>
-      </div>
-
-      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_filters">Фильтрация папок и файлов</h3>
-        <div class="space-y-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
-          
-          <div>
-            <label class="block text-xs font-medium mb-1" data-i18n="filter_hidden">Скрытые альбомы (снимите галочку, чтобы вернуть):</label>
-            <div id="hidden-albums-list" class="max-h-40 overflow-y-auto border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] p-2 space-y-1">
-               <!-- Checkboxes render here -->
-            </div>
-          </div>
-          
-          <div>
-            <label class="block text-xs font-medium mb-1" data-i18n="filter_exts">Исключить расширения файлов (через запятую):</label>
-            <input id="opt-exclude-exts" type="text" placeholder=".cr2, .cr3, .dng, .tif" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-          </div>
-          <div>
-            <label class="block text-xs font-medium mb-1" data-i18n="filter_masks">Исключить маски имен файлов (через запятую):</label>
-            <input id="opt-exclude-masks" type="text" placeholder="*_small.*, *_smal.*, ._*" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-          </div>
-          <div class="flex items-center justify-between pt-1">
-            <button onclick="saveGlobalSettings(true)" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_apply_filters">Применить фильтры</button>
-            <span id="filter-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-only-setting space-y-3 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <div class="flex items-center justify-between mb-2">
-          <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_cache">Кэш и миниатюры</h3>
-          <span id="cache-size-badge" class="text-xs font-semibold text-stone-600 dark:text-stone-400">...</span>
-        </div>
-        <div class="flex flex-wrap items-center gap-3">
-          <button onclick="triggerPregenerate()" id="pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-5 py-2.5 text-xs tracking-[0.18em] uppercase transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <span data-i18n="btn_pregen">Создать превью (400px / 1200px)</span>
-          </button>
-          <button onclick="cancelPregenerate()" id="pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.18em] uppercase transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
-            <span data-i18n="btn_stop">Остановить</span>
-          </button>
-          <button onclick="clearCacheFiles()" class="inline-flex items-center gap-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs tracking-[0.18em] uppercase transition">
-            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/></svg>
-            <span data-i18n="btn_clear_cache">Очистить кэш</span>
-          </button>
-          <span id="pregen-status-text" class="text-xs text-stone-500"></span>
-        </div>
-        <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
-          <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
-        </div>
-      </div>
-
-      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_libraries">Библиотеки фотографий (папки)</h3>
-        <div id="libraries-list" class="space-y-2 text-xs"></div>
-
-        <form id="library-form" onsubmit="handleSaveLibrary(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
-          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="lib-form-title" data-i18n="lib_form_title">Добавить или изменить библиотеку</div>
-          <input id="edit-lib-id" type="hidden" value="" />
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <input id="edit-lib-name" type="text" data-i18n-placeholder="lib_ph_name" placeholder="Название (напр. Семейный архив)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-            <input id="edit-lib-path" type="text" data-i18n-placeholder="lib_ph_path" placeholder="Путь в контейнере (напр. /photos_family)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs font-mono" />
-          </div>
-          <div class="flex items-center gap-2">
-            <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_lib">Сохранить библиотеку</button>
-            <button type="button" id="btn-cancel-lib-edit" onclick="resetLibraryForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
-        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
-        <div id="users-list" class="space-y-2 text-xs"></div>
-
-        <form id="user-form" autocomplete="off" onsubmit="handleSaveUser(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
-          <input type="hidden" id="edit-u-original-name" value="" />
-          <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="user-form-title" data-i18n="user_form_title">Добавить пользователя</div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <input id="new-u-name" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-            <input id="new-u-pass" type="password" autocomplete="new-password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-            <select id="new-u-role" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="user" data-i18n="role_user">Клиент</option>
-              <option value="admin" data-i18n="role_admin">Администратор</option>
-            </select>
           </div>
 
-          <div class="space-y-2">
-            <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
-            <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
-          </div>
-
-          <div class="space-y-1">
-            <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
-            <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-              <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
-            </select>
-          </div>
-
-          <div class="space-y-2">
-            <div class="flex items-center space-x-4 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
-              <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
-                <input type="radio" name="access-mode" value="allow" checked onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
-                <span data-i18n="mode_allow">Разрешенные папки</span>
+          <!-- ВКЛАДКА 2: ПРОСМОТР -->
+          <div id="settings-panel-viewing" class="settings-tab-panel hidden space-y-4">
+            <div class="admin-only-setting space-y-3">
+              <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_view_params">Параметры просмотра и загрузки</h3>
+              <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+                <div>
+                  <div class="text-sm font-medium flex items-center gap-1.5">
+                    <span data-i18n="opt_exif_title">Отображать параметры съемки (EXIF)</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_exif">Показывает данные камеры и съёмки при просмотре фото в лайтбоксе.</span>
+                    </span>
+                  </div>
+                  <div class="text-xs text-stone-500" data-i18n="opt_exif_desc">Камера, объектив, диафрагма, выдержка, ISO</div>
+                </div>
+                <input id="opt-show-exif" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100 shrink-0" />
               </label>
-              <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
-                <input type="radio" name="access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
-                <span data-i18n="mode_deny">Запрещенные папки</span>
+              <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+                <div>
+                  <div class="text-sm font-medium flex items-center gap-1.5">
+                    <span data-i18n="opt_zip_title">Разрешить скачивание альбомов ZIP</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_zip">Включает кнопку скачивания всего альбома или избранных файлов одним ZIP-архивом.</span>
+                    </span>
+                  </div>
+                  <div class="text-xs text-stone-500" data-i18n="opt_zip_desc">Кнопки загрузки архивов для клиентов</div>
+                </div>
+                <input id="opt-allow-zip" type="checkbox" onchange="saveGlobalSettings()" class="w-5 h-5 accent-stone-900 dark:accent-stone-100 shrink-0" />
+              </label>
+              <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
+                <div>
+                  <div class="text-sm font-medium text-red-600 dark:text-red-400" data-i18n="opt_show_hidden_title">Показывать скрытые альбомы</div>
+                  <div class="text-xs text-stone-500" data-i18n="opt_show_hidden_desc">Отображать скрытые альбомы в галерее (выделяются цветом)</div>
+                </div>
+                <input id="opt-show-hidden" type="checkbox" onchange="saveGlobalSettings(true)" class="w-5 h-5 accent-red-600 dark:accent-red-500 shrink-0" />
               </label>
             </div>
-            <div id="albums-checkbox-list" class="max-h-40 overflow-y-auto border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
           </div>
 
-          <div class="flex items-center gap-2">
-            <button type="submit" id="btn-save-user-submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_user">Сохранить пользователя</button>
-            <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+          <!-- ВКЛАДКА 3: БИБЛИОТЕКИ -->
+          <div id="settings-panel-libraries" class="settings-tab-panel hidden space-y-6">
+            <div class="admin-only-setting space-y-4">
+              <div class="flex items-center gap-1.5">
+                <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_libraries">Библиотеки фотографий (папки)</h3>
+                <span class="pixie-tip">
+                  <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                  <span class="pixie-tip-box" data-i18n="tip_libraries">Каждая библиотека — это отдельная корневая папка с альбомами. Указывайте путь внутри контейнера или на сервере.</span>
+                </span>
+              </div>
+              <div id="libraries-list" class="space-y-2 text-xs"></div>
+
+              <form id="library-form" onsubmit="handleSaveLibrary(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+                <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="lib-form-title" data-i18n="lib_form_title">Добавить или изменить библиотеку</div>
+                <input id="edit-lib-id" type="hidden" value="" />
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <input id="edit-lib-name" type="text" data-i18n-placeholder="lib_ph_name" placeholder="Название (напр. Семейный архив)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  <input id="edit-lib-path" type="text" data-i18n-placeholder="lib_ph_path" placeholder="Путь в контейнере (напр. /photos_family)" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs font-mono" />
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_lib">Сохранить библиотеку</button>
+                  <button type="button" id="btn-cancel-lib-edit" onclick="resetLibraryForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+                </div>
+              </form>
+            </div>
+
           </div>
-        </form>
+
+          <!-- ВКЛАДКА 4: ФИЛЬТРЫ -->
+          <div id="settings-panel-filters" class="settings-tab-panel hidden space-y-4">
+            <div class="admin-only-setting space-y-4">
+              <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_filters">Фильтрация папок и файлов</h3>
+              <div class="space-y-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                <div>
+                  <label class="flex items-center gap-1.5 text-xs font-medium mb-1">
+                    <span data-i18n="filter_hidden">Скрытые альбомы (снимите галочку, чтобы вернуть):</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_filter_hidden">Скрытые альбомы не видны в галерее, но остаются на диске.</span>
+                    </span>
+                  </label>
+                  <div id="hidden-albums-list" class="max-h-40 overflow-y-auto border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] p-2 space-y-1">
+                     <!-- Checkboxes render here -->
+                  </div>
+                </div>
+                <div>
+                  <label class="flex items-center gap-1.5 text-xs font-medium mb-1">
+                    <span data-i18n="filter_exts">Исключить расширения файлов (через запятую):</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_filter_exts">Например: .cr2, .dng, .tif — такие файлы не будут показаны в галерее и не удаляются с диска.</span>
+                    </span>
+                  </label>
+                  <input id="opt-exclude-exts" type="text" placeholder=".cr2, .cr3, .dng, .tif" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                </div>
+                <div>
+                  <label class="flex items-center gap-1.5 text-xs font-medium mb-1">
+                    <span data-i18n="filter_masks">Исключить маски имен файлов (через запятую):</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_filter_masks">Шаблоны имён, например *_thumb.*, ._*. Скрываются только из отображения.</span>
+                    </span>
+                  </label>
+                  <input id="opt-exclude-masks" type="text" placeholder="*_small.*, *_smal.*, ._*" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                </div>
+                <div class="flex items-center justify-between pt-1">
+                  <button onclick="saveGlobalSettings(true)" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_apply_filters">Применить фильтры</button>
+                  <span id="filter-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ВКЛАДКА 5: ОБСЛУЖИВАНИЕ -->
+          <div id="settings-panel-maintenance" class="settings-tab-panel hidden space-y-5">
+            <div class="admin-only-setting space-y-4">
+              <div class="flex items-center justify-between">
+                <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_cache">Кэш и миниатюры</h3>
+                <span id="cache-size-badge" class="text-xs font-semibold text-stone-600 dark:text-stone-400">...</span>
+              </div>
+
+              <!-- Детальная разбивка кэша -->
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-3">
+                  <div class="text-stone-500 uppercase tracking-wider text-[10px]" data-i18n="cache_thumbs_label">Превью (.webp)</div>
+                  <div id="cache-thumbs-size" class="text-sm font-semibold mt-1">...</div>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-3">
+                  <div class="text-stone-500 uppercase tracking-wider text-[10px]" data-i18n="cache_video_label">Рендер видео (.mp4)</div>
+                  <div id="cache-video-size" class="text-sm font-semibold mt-1">...</div>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-3">
+                  <div class="text-stone-500 uppercase tracking-wider text-[10px]" data-i18n="cache_total_label">Всего на диске</div>
+                  <div id="cache-total-size" class="text-sm font-semibold mt-1">...</div>
+                </div>
+              </div>
+
+              <!-- Лимит кэша видео -->
+              <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-2">
+                <label for="opt-video-cache-max-gb" class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider">
+                  <span data-i18n="video_cache_limit_label">Лимит кэша видео (ГБ)</span>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_video_limit">Максимальный размер папки транскодированных видео. При превышении самые давно просмотренные файлы удаляются автоматически (LRU). Укажите 0, чтобы отключить лимит (безлимит).</span>
+                  </span>
+                </label>
+                <div class="flex flex-wrap items-center gap-2">
+                  <input id="opt-video-cache-max-gb" type="number" min="0" step="0.5" class="w-32 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  <button type="button" onclick="saveVideoCacheLimit()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+                  <span id="video-limit-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- Единая область очистки (Избранное + Оптимизация кэша + Очистка кэша) -->
+            <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+              <div class="text-xs font-semibold uppercase tracking-wider text-stone-500" data-i18n="maintenance_cleanup_title">Очистка и оптимизация</div>
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="inline-flex items-center gap-1.5">
+                  <button type="button" onclick="clearAllFavorites()" class="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_clear_fav">Очистить избранное</button>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="clear_fav_desc">Снять отметку «Избранное» со всех ваших фото и видео</span>
+                  </span>
+                </div>
+
+                <div class="admin-only-setting inline-flex items-center gap-1.5">
+                  <button type="button" onclick="optimizeCacheFiles()" id="btn-optimize-cache" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"/></svg>
+                    <span data-i18n="btn_optimize_cache">Оптимизировать кэш</span>
+                  </button>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_optimize_cache">Удаляет превью, транскоды и метаданные файлов, которых больше нет в библиотеках (или изменился mtime), битые .tmp.mp4 и лишний видеокэш сверх лимита. Запускается вручную, чтобы не нагружать диск при большой базе.</span>
+                  </span>
+                </div>
+
+                <div class="admin-only-setting inline-flex items-center gap-1.5">
+                  <button type="button" onclick="clearCacheFiles()" class="inline-flex items-center gap-2 border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2-2v2"/></svg>
+                    <span data-i18n="btn_clear_cache">Очистить кэш</span>
+                  </button>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_clear_cache">Полностью удаляет все сгенерированные превью и транскодированные видео. Настройки, библиотеки и пользователи сохраняются.</span>
+                  </span>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-3">
+                <span id="fav-cleared-msg" class="text-xs text-green-600 hidden" data-i18n="msg_fav_cleared">✓ Избранное очищено</span>
+                <div id="optimize-result-msg" class="text-xs text-stone-600 dark:text-stone-400 hidden"></div>
+              </div>
+            </div>
+
+            <!-- Прегенерация миниатюр -->
+            <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="inline-flex items-center gap-1.5">
+                  <button onclick="triggerPregenerate()" id="pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                    <span data-i18n="btn_pregen">Создать превью (400px / 1200px)</span>
+                  </button>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_pregen">Заранее создаёт миниатюры (400px и 1200px) и кэширует EXIF/видео-метаданные для всех файлов, чтобы галерея открывалась мгновенно.</span>
+                  </span>
+                </div>
+                <button onclick="cancelPregenerate()" id="pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
+                  <span data-i18n="btn_stop">Остановить</span>
+                </button>
+                <span id="pregen-status-text" class="text-xs text-stone-500"></span>
+              </div>
+              <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
+                <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ВКЛАДКА 4: ПОЛЬЗОВАТЕЛИ -->
+          <div id="settings-panel-users" class="settings-tab-panel hidden space-y-4">
+            <div class="admin-only-setting space-y-4">
+              <div class="flex items-center gap-1.5">
+                <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
+                <span class="pixie-tip">
+                  <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                  <span class="pixie-tip-box" data-i18n="tip_users_access">Настройте, к каким библиотекам и альбомам имеет доступ каждый пользователь (белый или чёрный список папок).</span>
+                </span>
+              </div>
+              <div id="users-list" class="space-y-2 text-xs"></div>
+
+              <form id="user-form" autocomplete="off" onsubmit="handleSaveUser(event)" class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
+                <input type="hidden" id="edit-u-original-name" value="" />
+                <div class="text-xs font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300" id="user-form-title" data-i18n="user_form_title">Добавить пользователя</div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <input id="new-u-name" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  <input id="new-u-pass" type="password" autocomplete="new-password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  <select id="new-u-role" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="user" data-i18n="role_user">Клиент</option>
+                    <option value="admin" data-i18n="role_admin">Администратор</option>
+                  </select>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
+                  <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
+                </div>
+
+                <div class="space-y-1">
+                  <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
+                  <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
+                  </select>
+                </div>
+
+                <div class="space-y-2">
+                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
+                    <div class="flex items-center space-x-4">
+                      <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                        <input type="radio" name="access-mode" value="allow" checked onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
+                        <span data-i18n="mode_allow">Разрешенные папки</span>
+                      </label>
+                      <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                        <input type="radio" name="access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
+                        <span data-i18n="mode_deny">Запрещенные папки</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2.5 text-xs">
+                    <span id="selected-albums-summary" class="text-stone-600 dark:text-stone-300 font-medium">...</span>
+                    <button type="button" onclick="openAlbumPicker()" class="border border-stone-800 dark:border-stone-300 px-3 py-1.5 text-xs tracking-wider uppercase hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition" data-i18n="btn_configure_albums">Настроить папки…</button>
+                  </div>
+                </div>
+
+                <div class="flex items-center gap-2">
+                  <button type="submit" id="btn-save-user-submit" class="bg-stone-800 hover:bg-black dark:bg-stone-200 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_save_user">Сохранить пользователя</button>
+                  <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ВЫБОРА ПАПОК / АЛЬБОМОВ ДЛЯ ПОЛЬЗОВАТЕЛЯ -->
+  <div id="album-picker-modal" class="fixed inset-0 z-[60] hidden bg-black/60 backdrop-blur-xs flex items-center justify-center sm:p-4">
+    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-3xl w-full h-[100dvh] sm:h-[82vh] sm:max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 px-5 py-4 shrink-0">
+        <h3 class="serif-title text-lg sm:text-xl tracking-[0.12em] uppercase" data-i18n="album_picker_title">Доступ к папкам и альбомам</h3>
+        <button type="button" onclick="closeAlbumPicker(false)" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
+          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      <div class="px-5 py-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#141414] space-y-3 shrink-0">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center space-x-4 text-xs uppercase tracking-wider">
+            <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+              <input type="radio" name="picker-access-mode" value="allow" onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
+              <span data-i18n="mode_allow">Разрешенные папки</span>
+            </label>
+            <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+              <input type="radio" name="picker-access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
+              <span data-i18n="mode_deny">Запрещенные папки</span>
+            </label>
+          </div>
+          <label class="cursor-pointer flex items-center space-x-2 text-xs font-semibold">
+            <input id="picker-all-albums-cb" type="checkbox" onchange="togglePickerAllAlbums(this.checked)" class="accent-stone-900 dark:accent-stone-100" />
+            <span>★ <span data-i18n="all_albums_star">ВСЕ АЛЬБОМЫ (*)</span></span>
+          </label>
+        </div>
+        <input id="album-picker-search" type="text" oninput="renderAlbumPickerGroups()" data-i18n-placeholder="album_picker_search_ph" placeholder="Поиск папки или альбома..." class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+      </div>
+
+      <div id="album-picker-groups" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-5 space-y-4 text-xs"></div>
+
+      <div class="flex items-center justify-between border-t border-stone-200 dark:border-stone-800 px-5 py-3.5 shrink-0 bg-stone-50 dark:bg-[#141414]">
+        <span id="album-picker-count" class="text-xs text-stone-600 dark:text-stone-400">...</span>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="closeAlbumPicker(false)" class="border border-stone-300 dark:border-stone-700 px-4 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
+          <button type="button" onclick="closeAlbumPicker(true)" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-5 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_done">Готово</button>
+        </div>
       </div>
     </div>
   </div>
@@ -783,6 +1065,48 @@
         filter_masks: 'Исключить маски имен файлов (через запятую):',
         btn_apply_filters: 'Применить фильтры',
         settings_cache: 'Кэш и миниатюры',
+        tab_interface: 'Интерфейс',
+        tab_appearance: 'Оформление',
+        tab_viewing: 'Просмотр',
+        tab_libraries: 'Библиотеки и фильтры',
+        tab_libraries_only: 'Библиотеки',
+        tab_filters: 'Фильтры',
+        maintenance_cleanup_title: 'Очистка и оптимизация',
+        btn_configure_albums: 'Настроить папки…',
+        albums_selected_none: 'Папки не выбраны (0)',
+        albums_selected_count: 'Выбрано папок:',
+        album_picker_title: 'Доступ к папкам и альбомам',
+        album_picker_search_ph: 'Поиск папки или альбома...',
+        btn_select_all: 'Выбрать все',
+        btn_clear_all: 'Снять все',
+        btn_done: 'Готово',
+        album_picker_empty: 'Нет доступных папок по заданному фильтру',
+        tab_maintenance: 'Обслуживание',
+        tab_users: 'Пользователи',
+        cache_thumbs_label: 'Превью (.webp)',
+        cache_video_label: 'Рендер видео (.mp4)',
+        cache_total_label: 'Всего на диске',
+        video_cache_limit_label: 'Лимит кэша видео (ГБ)',
+        btn_optimize_cache: 'Оптимизировать кэш',
+        optimizing_cache: 'Оптимизация...',
+        optimize_done_prefix: 'Оптимизация завершена: удалено превью',
+        optimize_done_videos: 'видео',
+        optimize_done_tmp: 'врем.',
+        optimize_done_meta: 'метаданных',
+        optimize_done_freed: 'освобождено',
+        optimize_skipped_orphans: '(удаление сирот пропущено: одна из библиотек недоступна)',
+        tip_ratio: '«Без обрезки» сохраняет оригинальное соотношение сторон (justified сетка), «Ровная плитка» обрезает миниатюры до 4:3.',
+        tip_exif: 'Показывает данные камеры и съёмки при просмотре фото в лайтбоксе.',
+        tip_zip: 'Включает кнопку скачивания всего альбома или избранных файлов одним ZIP-архивом.',
+        tip_libraries: 'Каждая библиотека — это отдельная корневая папка с альбомами. Указывайте путь внутри контейнера или на сервере.',
+        tip_filter_hidden: 'Скрытые альбомы не видны в галерее, но остаются на диске.',
+        tip_filter_exts: 'Например: .cr2, .dng, .tif — такие файлы не будут показаны в галерее и не удаляются с диска.',
+        tip_filter_masks: 'Шаблоны имён, например *_thumb.*, ._*. Скрываются только из отображения.',
+        tip_video_limit: 'Максимальный размер папки транскодированных видео. При превышении самые давно просмотренные файлы удаляются автоматически (LRU). Укажите 0, чтобы отключить лимит (безлимит).',
+        tip_optimize_cache: 'Удаляет превью, транскоды и метаданные файлов, которых больше нет в библиотеках (или изменился mtime), битые .tmp.mp4 и лишний видеокэш сверх лимита. Запускается вручную, чтобы не нагружать диск при большой базе.',
+        tip_clear_cache: 'Полностью удаляет все сгенерированные превью и транскодированные видео. Настройки, библиотеки и пользователи сохраняются.',
+        tip_pregen: 'Заранее создаёт миниатюры (400px и 1200px) и кэширует EXIF/видео-метаданные для всех файлов, чтобы галерея открывалась мгновенно.',
+        tip_users_access: 'Настройте, к каким библиотекам и альбомам имеет доступ каждый пользователь (белый или чёрный список папок).',
         cache_size: 'Размер кэша:',
         btn_pregen: 'Создать превью (400px / 1200px)',
         btn_stop: 'Остановить',
@@ -931,6 +1255,48 @@
         filter_masks: 'Exclude filename masks (comma-separated):',
         btn_apply_filters: 'Apply Filters',
         settings_cache: 'Cache & Thumbnails',
+        tab_interface: 'Interface',
+        tab_appearance: 'Appearance',
+        tab_viewing: 'Viewing',
+        tab_libraries: 'Libraries & Filters',
+        tab_libraries_only: 'Libraries',
+        tab_filters: 'Filters',
+        maintenance_cleanup_title: 'Cleanup & Optimization',
+        btn_configure_albums: 'Configure Folders…',
+        albums_selected_none: 'No folders selected (0)',
+        albums_selected_count: 'Selected folders:',
+        album_picker_title: 'Folder & Album Access',
+        album_picker_search_ph: 'Search folder or album...',
+        btn_select_all: 'Select All',
+        btn_clear_all: 'Clear All',
+        btn_done: 'Done',
+        album_picker_empty: 'No folders match the filter',
+        tab_maintenance: 'Maintenance',
+        tab_users: 'Users',
+        cache_thumbs_label: 'Previews (.webp)',
+        cache_video_label: 'Video Renders (.mp4)',
+        cache_total_label: 'Total on Disk',
+        video_cache_limit_label: 'Video Cache Limit (GB)',
+        btn_optimize_cache: 'Optimize Cache',
+        optimizing_cache: 'Optimizing...',
+        optimize_done_prefix: 'Optimization complete: removed previews',
+        optimize_done_videos: 'videos',
+        optimize_done_tmp: 'temp',
+        optimize_done_meta: 'metadata',
+        optimize_done_freed: 'freed',
+        optimize_skipped_orphans: '(orphan cleanup skipped: a library path is unavailable)',
+        tip_ratio: '"Original" keeps original aspect ratios (justified grid); "Crop" crops thumbnails to a uniform 4:3 grid.',
+        tip_exif: 'Displays camera and exposure metadata when viewing a photo in the lightbox.',
+        tip_zip: 'Enables downloading an entire album or selected favorites as a single ZIP archive.',
+        tip_libraries: 'Each library is a separate root folder containing albums. Specify the path inside the container or on the server.',
+        tip_filter_hidden: 'Hidden albums are omitted from the gallery view while remaining untouched on disk.',
+        tip_filter_exts: 'For example: .cr2, .dng, .tif — matching files are hidden from the gallery without deleting them from disk.',
+        tip_filter_masks: 'Filename patterns such as *_thumb.*, ._*. Only hidden from display.',
+        tip_video_limit: 'Maximum size of the transcoded video cache folder. When exceeded, least recently watched files are evicted automatically (LRU). Set to 0 for unlimited.',
+        tip_optimize_cache: 'Removes orphaned previews, transcoded videos, and metadata for deleted/modified files, broken .tmp.mp4 files, and excess video cache beyond the limit. Run manually to avoid unnecessary disk scans on large libraries.',
+        tip_clear_cache: 'Completely deletes all generated previews and transcoded videos. Settings, libraries, and users are preserved.',
+        tip_pregen: 'Pre-generates 400px & 1200px thumbnails and caches EXIF/video metadata for all files so the gallery loads instantly.',
+        tip_users_access: 'Configure which libraries and albums each user can access (allowlist or blocklist).',
         cache_size: 'Cache size:',
         btn_pregen: 'Generate Previews (400px / 1200px)',
         btn_stop: 'Stop',
@@ -1224,6 +1590,8 @@
 
     function setUserMode(mode) {
       currentUserEditMode = mode;
+      document.querySelectorAll(`input[name="access-mode"][value="${mode}"]`).forEach(r => { r.checked = true; });
+      document.querySelectorAll(`input[name="picker-access-mode"][value="${mode}"]`).forEach(r => { r.checked = true; });
     }
 
     async function initApp() {
@@ -2483,11 +2851,46 @@
       renderHiddenAlbumsCheckboxes();
     }
 
+    let activeSettingsTab = 'appearance';
+
+    function switchSettingsTab(tabName) {
+      activeSettingsTab = tabName;
+      document.querySelectorAll('.settings-tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.settingsTab === tabName);
+      });
+      document.querySelectorAll('.settings-tab-panel').forEach(panel => {
+        panel.classList.toggle('hidden', panel.id !== `settings-panel-${tabName}`);
+      });
+      document.querySelectorAll('.pixie-tip.open').forEach(el => el.classList.remove('open'));
+    }
+
+    function togglePixieTip(e, btn) {
+      e.preventDefault();
+      e.stopPropagation();
+      const tip = btn.closest('.pixie-tip');
+      const wasOpen = tip.classList.contains('open');
+      document.querySelectorAll('.pixie-tip.open').forEach(el => el.classList.remove('open'));
+      if (!wasOpen) tip.classList.add('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.pixie-tip')) {
+        document.querySelectorAll('.pixie-tip.open').forEach(el => el.classList.remove('open'));
+      }
+    });
+
     async function openSettingsModal() {
       const isAdmin = currentUser && currentUser.role === 'admin';
       document.querySelectorAll('.admin-only-setting').forEach(el => {
         el.classList.toggle('hidden', !isAdmin);
       });
+      if (!isAdmin && activeSettingsTab !== 'appearance' && activeSettingsTab !== 'maintenance') {
+        switchSettingsTab('appearance');
+      } else if (!document.getElementById(`settings-panel-${activeSettingsTab}`)) {
+        switchSettingsTab('appearance');
+      } else {
+        switchSettingsTab(activeSettingsTab);
+      }
       const prefLang = document.getElementById('pref-lang');
       if (prefLang) prefLang.value = currentLang;
       const favClearedMsg = document.getElementById('fav-cleared-msg');
@@ -2500,8 +2903,16 @@
         document.getElementById('opt-show-hidden').checked = !!appSettings.show_hidden_albums;
         document.getElementById('opt-exclude-exts').value = appSettings.exclude_extensions || '';
         document.getElementById('opt-exclude-masks').value = appSettings.exclude_masks || '';
+        const videoLimitEl = document.getElementById('opt-video-cache-max-gb');
+        if (videoLimitEl) {
+          videoLimitEl.value = appSettings.video_cache_max_gb !== undefined ? appSettings.video_cache_max_gb : 5;
+        }
         document.getElementById('filter-saved-msg').classList.add('hidden');
         document.getElementById('title-saved-msg').classList.add('hidden');
+        const vLimitMsg = document.getElementById('video-limit-saved-msg');
+        if (vLimitMsg) vLimitMsg.classList.add('hidden');
+        const optResMsg = document.getElementById('optimize-result-msg');
+        if (optResMsg) optResMsg.classList.add('hidden');
 
         await loadLibrariesAdmin();
         resetLibraryForm();
@@ -2689,6 +3100,13 @@
       appSettings.show_hidden_albums = document.getElementById('opt-show-hidden').checked;
       appSettings.exclude_extensions = document.getElementById('opt-exclude-exts').value;
       appSettings.exclude_masks = document.getElementById('opt-exclude-masks').value;
+      const videoLimitEl = document.getElementById('opt-video-cache-max-gb');
+      if (videoLimitEl && videoLimitEl.value !== '') {
+        const parsedLimit = parseFloat(videoLimitEl.value);
+        if (!Number.isNaN(parsedLimit) && parsedLimit >= 0) {
+          appSettings.video_cache_max_gb = parsedLimit;
+        }
+      }
 
       const res = await fetch('/api/settings', {
         method: 'POST',
@@ -2715,6 +3133,40 @@
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 3000);
         await loadStructure();
+      }
+    }
+
+    async function saveVideoCacheLimit() {
+      await saveGalleryTitleOnly();
+      const msg = document.getElementById('video-limit-saved-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+    }
+
+    async function optimizeCacheFiles() {
+      const btn = document.getElementById('btn-optimize-cache');
+      const msgEl = document.getElementById('optimize-result-msg');
+      if (btn) btn.disabled = true;
+      if (msgEl) {
+        msgEl.textContent = t('optimizing_cache');
+        msgEl.classList.remove('hidden');
+      }
+      try {
+        const res = await fetch('/api/cache/optimize', { method: 'POST' });
+        if (res.ok) {
+          const data = await res.json();
+          if (msgEl) {
+            let summary = `${t('optimize_done_prefix')}: ${data.deleted_thumbs}, ${t('optimize_done_videos')}: ${data.deleted_videos}, ${t('optimize_done_tmp')}: ${data.deleted_tmp}, ${t('optimize_done_meta')}: ${data.deleted_meta_entries} — ${t('optimize_done_freed')} ${formatBytes(data.freed_bytes || 0)}`;
+            if (data.orphans_skipped) summary += ` ${t('optimize_skipped_orphans')}`;
+            msgEl.textContent = summary;
+            msgEl.classList.remove('hidden');
+          }
+          await pollPregenStatus();
+        }
+      } finally {
+        if (btn) btn.disabled = false;
       }
     }
 
@@ -2761,9 +3213,21 @@
       const actionBtn = document.getElementById('pregen-action-btn');
       const cancelBtn = document.getElementById('pregen-cancel-btn');
       const badgeEl = document.getElementById('cache-size-badge');
+      const thumbsEl = document.getElementById('cache-thumbs-size');
+      const videoEl = document.getElementById('cache-video-size');
+      const totalEl = document.getElementById('cache-total-size');
 
       if (badgeEl && st.cache_size_bytes !== undefined) {
         badgeEl.textContent = `${t('cache_size')} ${formatBytes(st.cache_size_bytes)}`;
+      }
+      if (thumbsEl && st.thumbs_size_bytes !== undefined) {
+        thumbsEl.textContent = formatBytes(st.thumbs_size_bytes);
+      }
+      if (videoEl && st.video_cache_size_bytes !== undefined) {
+        videoEl.textContent = formatBytes(st.video_cache_size_bytes);
+      }
+      if (totalEl && st.cache_size_bytes !== undefined) {
+        totalEl.textContent = formatBytes(st.cache_size_bytes);
       }
 
       if (st.running) {
@@ -2785,28 +3249,162 @@
       }
     }
 
-    function toggleAllAlbumsCheckbox(starCb) {
-      const isChecked = starCb.checked;
-      document.querySelectorAll('#albums-checkbox-list .album-cb').forEach(cb => {
-        if (cb !== starCb) cb.checked = isChecked;
-      });
+    let selectedUserAlbums = [];
+    let pickerDraftAlbums = new Set();
+    let pickerDraftAll = false;
+
+    function updateSelectedAlbumsSummary() {
+      const el = document.getElementById('selected-albums-summary');
+      if (!el) return;
+      if (selectedUserAlbums.includes('*')) {
+        el.textContent = `★ ${t('all_albums_star')}`;
+      } else if (selectedUserAlbums.length === 0) {
+        el.textContent = t('albums_selected_none');
+      } else {
+        el.textContent = `${t('albums_selected_count')} ${selectedUserAlbums.length}`;
+      }
     }
 
     function renderAlbumCheckboxes(selectedAlbums = [], mode = 'allow') {
-      const box = document.getElementById('albums-checkbox-list');
-      const modeRadio = document.querySelector(`input[name="access-mode"][value="${mode}"]`);
-      if (modeRadio) modeRadio.checked = true;
-      currentUserEditMode = mode;
+      selectedUserAlbums = Array.isArray(selectedAlbums) ? [...selectedAlbums] : [];
+      setUserMode(mode);
+      updateSelectedAlbumsSummary();
+    }
 
-      const multiLibs = adminLibraries && adminLibraries.length > 1;
-      const isAllChecked = selectedAlbums.includes('*');
-      let html = `<label class="flex items-center space-x-2 font-medium"><input type="checkbox" value="*" ${isAllChecked ? 'checked' : ''} onchange="syncStarCheckboxGroup('.album-cb', this)" class="album-cb accent-stone-900" /><span>★ ${t('all_albums_star')}</span></label>`;
-      for (const a of allAlbumsCatalog) {
-        const isChecked = isAllChecked || selectedAlbums.includes(a.path);
-        const displayName = (multiLibs && a.lib_name) ? `[${a.lib_name}] ${a.name || a.path}` : (a.name || a.path);
-        html += `<label class="flex items-center space-x-2 truncate"><input type="checkbox" value="${a.path}" ${isChecked ? 'checked' : ''} onchange="syncStarCheckboxGroup('.album-cb', this)" class="album-cb accent-stone-900" /><span class="truncate" title="${a.label}">${displayName}</span></label>`;
+    function _getPickerAllowedLibIds() {
+      const checkedLibsRaw = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
+      const specific = checkedLibsRaw.filter(v => v !== '*');
+      if (checkedLibsRaw.includes('*') || specific.length === 0) {
+        return null;
       }
-      box.innerHTML = html;
+      return new Set(specific);
+    }
+
+    function updateAlbumPickerCount() {
+      const el = document.getElementById('album-picker-count');
+      if (!el) return;
+      if (pickerDraftAll) {
+        el.textContent = `★ ${t('all_albums_star')}`;
+      } else if (pickerDraftAlbums.size === 0) {
+        el.textContent = t('albums_selected_none');
+      } else {
+        el.textContent = `${t('albums_selected_count')} ${pickerDraftAlbums.size}`;
+      }
+    }
+
+    function openAlbumPicker() {
+      pickerDraftAll = selectedUserAlbums.includes('*');
+      pickerDraftAlbums = new Set(selectedUserAlbums.filter(v => v !== '*'));
+      const allCb = document.getElementById('picker-all-albums-cb');
+      if (allCb) allCb.checked = pickerDraftAll;
+      const searchEl = document.getElementById('album-picker-search');
+      if (searchEl) searchEl.value = '';
+      setUserMode(currentUserEditMode);
+      renderAlbumPickerGroups();
+      updateAlbumPickerCount();
+      document.getElementById('album-picker-modal').classList.remove('hidden');
+    }
+
+    function closeAlbumPicker(apply = false) {
+      if (apply) {
+        selectedUserAlbums = pickerDraftAll ? ['*'] : Array.from(pickerDraftAlbums);
+        updateSelectedAlbumsSummary();
+      }
+      document.getElementById('album-picker-modal').classList.add('hidden');
+    }
+
+    function togglePickerAllAlbums(checked) {
+      pickerDraftAll = checked;
+      renderAlbumPickerGroups();
+      updateAlbumPickerCount();
+    }
+
+    function togglePickerAlbumItem(path, checked) {
+      if (pickerDraftAll && !checked) {
+        pickerDraftAll = false;
+        const allCb = document.getElementById('picker-all-albums-cb');
+        if (allCb) allCb.checked = false;
+        const allowedLibIds = _getPickerAllowedLibIds();
+        pickerDraftAlbums = new Set(
+          allAlbumsCatalog
+            .filter(a => !allowedLibIds || allowedLibIds.has(a.lib_id || 'default'))
+            .map(a => a.path)
+        );
+      }
+      if (checked) {
+        pickerDraftAlbums.add(path);
+      } else {
+        pickerDraftAlbums.delete(path);
+      }
+      updateAlbumPickerCount();
+    }
+
+    function togglePickerLibAll(libId, selectAll) {
+      pickerDraftAll = false;
+      const allCb = document.getElementById('picker-all-albums-cb');
+      if (allCb) allCb.checked = false;
+      for (const a of allAlbumsCatalog) {
+        if ((a.lib_id || 'default') === libId) {
+          if (selectAll) pickerDraftAlbums.add(a.path);
+          else pickerDraftAlbums.delete(a.path);
+        }
+      }
+      renderAlbumPickerGroups();
+      updateAlbumPickerCount();
+    }
+
+    function renderAlbumPickerGroups() {
+      const container = document.getElementById('album-picker-groups');
+      if (!container) return;
+      const q = (document.getElementById('album-picker-search')?.value || '').trim().toLowerCase();
+      const allowedLibIds = _getPickerAllowedLibIds();
+
+      const groups = new Map();
+      for (const a of allAlbumsCatalog) {
+        const lid = a.lib_id || 'default';
+        if (allowedLibIds && !allowedLibIds.has(lid)) continue;
+        const label = (a.name || a.path || '').toLowerCase();
+        const fullLabel = (a.label || '').toLowerCase();
+        if (q && !label.includes(q) && !fullLabel.includes(q)) continue;
+        if (!groups.has(lid)) {
+          groups.set(lid, { name: a.lib_name || lid, items: [] });
+        }
+        groups.get(lid).items.push(a);
+      }
+
+      if (groups.size === 0) {
+        container.innerHTML = `<div class="text-center text-stone-500 py-8">${t('album_picker_empty')}</div>`;
+        return;
+      }
+
+      let html = '';
+      for (const [lid, grp] of groups.entries()) {
+        const safeLid = lid.replace(/'/g, "\\'");
+        html += `
+          <div class="border border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-[#141414]">
+            <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-stone-200 dark:border-stone-800 bg-stone-100/80 dark:bg-[#1e1e1e]">
+              <span class="font-semibold uppercase tracking-wider text-[11px] text-stone-700 dark:text-stone-300">${grp.name} (${grp.items.length})</span>
+              <div class="flex items-center gap-2 text-[11px]">
+                <button type="button" onclick="togglePickerLibAll('${safeLid}', true)" class="text-stone-600 dark:text-stone-300 hover:underline">${t('btn_select_all')}</button>
+                <span class="text-stone-300 dark:text-stone-600">|</span>
+                <button type="button" onclick="togglePickerLibAll('${safeLid}', false)" class="text-stone-600 dark:text-stone-300 hover:underline">${t('btn_clear_all')}</button>
+              </div>
+            </div>
+            <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+        `;
+        for (const a of grp.items) {
+          const isChecked = pickerDraftAll || pickerDraftAlbums.has(a.path);
+          const safePath = a.path.replace(/'/g, "\\'");
+          html += `
+            <label class="flex items-center space-x-2 truncate cursor-pointer hover:text-black dark:hover:text-white">
+              <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="togglePickerAlbumItem('${safePath}', this.checked)" class="accent-stone-900 dark:accent-stone-100 shrink-0" />
+              <span class="truncate" title="${a.label}">${a.name || a.path}</span>
+            </label>
+          `;
+        }
+        html += `</div></div>`;
+      }
+      container.innerHTML = html;
     }
 
     let adminUsersList = [];
@@ -2897,8 +3495,7 @@
       const password = document.getElementById('new-u-pass').value;
       const role = document.getElementById('new-u-role').value;
       const mode = currentUserEditMode;
-      const checkedRaw = Array.from(document.querySelectorAll('.album-cb:checked')).map(cb => cb.value);
-      const checked = checkedRaw.includes('*') ? ['*'] : checkedRaw.filter(v => v !== '*');
+      const checked = selectedUserAlbums.includes('*') ? ['*'] : selectedUserAlbums.filter(v => v !== '*');
       const checkedLibsRaw = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
       const specificLibs = checkedLibsRaw.filter(v => v !== '*');
       const allowedLibraries = (role === 'admin' || checkedLibsRaw.includes('*') || specificLibs.length === 0) ? ['*'] : specificLibs;
