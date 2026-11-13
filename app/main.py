@@ -1747,6 +1747,8 @@ def get_album(album_path: str, lib: Optional[str] = "default", user: dict = Depe
                 "is_native_video": ext in SUPPORTED_NATIVE_VIDEO_EXTS,
                 "duration": meta.get("duration_str", "00:00"),
                 "duration_seconds": meta.get("duration", 0),
+                "width": meta.get("width", 0),
+                "height": meta.get("height", 0),
                 "stream_url": f"/api/video/stream/{q_rel}?lib={q_lib}",
                 "thumb": f"/api/thumb/400/{q_rel}?lib={q_lib}",
                 "preview": f"/api/thumb/1200/{q_rel}?lib={q_lib}",

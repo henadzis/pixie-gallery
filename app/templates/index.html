@@ -2328,6 +2328,14 @@
       }
     }
 
+    function getVideoResolutionBadge(p) {
+      if (!p || p.media_type !== 'video') return '';
+      const w = Number(p.width || p.video_info?.width || 0);
+      const h = Number(p.height || p.video_info?.height || 0);
+      if (!w || !h) return '';
+      return `${Math.min(w, h)}p`;
+    }
+
     function renderAlbumPhotos() {
       const favPhotos = currentPhotos.filter(p => p.is_favorite);
       document.getElementById('fav-counter-badge').textContent = favPhotos.length;
@@ -2390,6 +2398,11 @@
               <svg class="w-3 h-3 fill-current" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               <span>${p.duration || 'VIDEO'}</span>
             </div>
+            ${getVideoResolutionBadge(p) ? `
+              <div class="absolute bottom-2 right-2 z-10 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-xs text-white text-[10px] font-medium tracking-wider pointer-events-none">
+                ${getVideoResolutionBadge(p)}
+              </div>
+            ` : ''}
           ` : ''}
           <div class="thumb-retry-overlay absolute inset-0 hidden flex flex-col items-center justify-center bg-stone-100/95 dark:bg-stone-900/95 text-stone-500 z-10 text-center pointer-events-auto p-2">
             <button type="button" onclick="retryThumbManual(event, ${idx})" class="p-2.5 rounded-full border border-stone-300 dark:border-stone-700 bg-white/80 dark:bg-black/60 hover:border-stone-800 dark:hover:border-stone-300 text-stone-700 dark:text-stone-300 transition shadow-sm" title="${t('thumb_retry')}">
