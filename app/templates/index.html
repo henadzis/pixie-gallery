@@ -123,15 +123,18 @@
 
   <!-- ШАПКА -->
   <header class="flex-none z-30 bg-[#faf9f6]/90 dark:bg-[#121212]/90 backdrop-blur-md border-b border-stone-200/70 dark:border-stone-800">
-    <div class="max-w-full mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-2">
-      <div class="flex items-center space-x-2 md:space-x-3 min-w-0">
+    <div class="max-w-full mx-auto px-3 md:px-6 h-16 flex items-center justify-between gap-1.5 md:gap-2">
+      <div class="flex items-center gap-1.5 md:gap-3 min-w-0">
         <button onclick="toggleSidebarCollapse()" class="hidden md:flex items-center justify-center w-8 h-8 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 text-stone-600 dark:text-stone-300 transition" title="Toggle Sidebar">
           <svg id="collapse-icon" class="w-4 h-4 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
         </button>
-        <button onclick="toggleMobileSidebar()" class="md:hidden p-2 text-stone-600 dark:text-stone-300">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+        <button onclick="toggleMobileSidebar()" class="md:hidden inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-800 dark:text-stone-200 shrink-0 transition" title="Альбомы" data-i18n-title="sidebar_title">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+            <line x1="9" y1="3" x2="9" y2="21"></line>
+          </svg>
         </button>
 
         <button onclick="showHome()" id="header-home-btn" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 transition bg-transparent text-stone-800 dark:text-stone-200 shrink-0" title="На главную" data-i18n-title="nav_home">
@@ -140,27 +143,29 @@
           </svg>
         </button>
 
-        <div id="library-switcher-wrap" class="relative hidden shrink-0">
-          <button type="button" id="library-switcher-btn" onclick="toggleLibraryDropdown(event)" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 transition bg-transparent text-stone-800 dark:text-stone-200">
-            <svg id="library-chevron-icon" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-          <div id="library-dropdown-menu" class="hidden absolute left-0 mt-1.5 min-w-[200px] max-w-xs bg-white dark:bg-[#1a1a1a] border border-stone-200 dark:border-stone-800 shadow-lg py-1 z-50 text-xs"></div>
+        <div class="hidden md:block shrink-0">
+          <div id="library-switcher-wrap" class="relative hidden shrink-0">
+            <button type="button" id="library-switcher-btn" onclick="toggleLibraryDropdown(event)" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 transition bg-transparent text-stone-800 dark:text-stone-200">
+              <svg id="library-chevron-icon" class="w-3.5 h-3.5 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+            <div id="library-dropdown-menu" class="hidden absolute left-0 mt-1.5 min-w-[200px] max-w-xs bg-white dark:bg-[#1a1a1a] border border-stone-200 dark:border-stone-800 shadow-lg py-1 z-50 text-xs"></div>
+          </div>
         </div>
 
-        <span id="header-brand-title" class="serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium text-left ml-1 truncate select-none">
+        <span id="header-brand-title" class="hidden sm:inline serif-title text-lg md:text-2xl tracking-[0.2em] uppercase font-medium text-left ml-1 truncate select-none">
           {{ title }}
         </span>
       </div>
 
-      <div class="flex items-center space-x-2 md:space-x-3 text-xs tracking-[0.12em] uppercase shrink-0">
+      <div class="flex items-center gap-1.5 md:gap-3 text-xs tracking-[0.12em] uppercase shrink-0">
         <!-- Глобальный переключатель медиа и избранного для активной библиотеки -->
         <div class="inline-flex items-center gap-1.5 shrink-0">
           <div id="media-filter-btn-group" class="inline-flex items-center border border-stone-300 dark:border-stone-700 p-0.5 text-[11px] tracking-wider shrink-0">
-            <button type="button" onclick="setMediaTypeFilter('all')" id="btn-media-all" class="px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition" data-i18n="filter_all">Все</button>
-            <button type="button" onclick="setMediaTypeFilter('photo')" id="btn-media-photo" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_photos">Фото</button>
-            <button type="button" onclick="setMediaTypeFilter('video')" id="btn-media-video" class="px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_videos">Видео</button>
+            <button type="button" onclick="setMediaTypeFilter('all')" id="btn-media-all" class="px-2 sm:px-2.5 py-1 uppercase font-medium bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900 transition" data-i18n="filter_all">Все</button>
+            <button type="button" onclick="setMediaTypeFilter('photo')" id="btn-media-photo" class="px-2 sm:px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_photos">Фото</button>
+            <button type="button" onclick="setMediaTypeFilter('video')" id="btn-media-video" class="px-2 sm:px-2.5 py-1 uppercase font-medium text-stone-600 dark:text-stone-400 hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="filter_videos">Видео</button>
           </div>
           <button type="button" onclick="toggleGlobalFavoritesFilter()" id="btn-media-fav" title="Только избранное" data-i18n-title="filter_favorites_title" aria-pressed="false" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-600 dark:text-stone-400 transition">
             <svg id="btn-media-fav-icon" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
@@ -187,26 +192,79 @@
           </select>
         </div>
 
-        <button onclick="toggleTheme()" id="header-theme-btn" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Toggle Theme">
+        <button onclick="toggleTheme()" id="header-theme-btn" class="hidden md:inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Toggle Theme">
           <svg class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
 
-        <button onclick="toggleLanguage()" id="header-lang-btn" class="border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs font-medium transition">
+        <button onclick="toggleLanguage()" id="header-lang-btn" class="hidden md:inline-flex border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs font-medium transition">
           RU
         </button>
 
         <span id="current-user-badge" class="text-stone-400 hidden xl:inline"></span>
 
-        <button id="settings-btn" onclick="openSettingsModal()" class="hidden inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 transition">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
-          <span class="hidden md:inline" data-i18n="nav_settings">Настройки</span>
-        </button>
+        <div class="hidden md:inline-flex">
+          <button id="settings-btn" onclick="openSettingsModal()" class="hidden inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 transition">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="hidden md:inline" data-i18n="nav_settings">Настройки</span>
+          </button>
+        </div>
 
-        <button onclick="handleLogout()" class="text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition" data-i18n="nav_logout">Выйти</button>
+        <button onclick="handleLogout()" class="hidden md:inline-flex text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition" data-i18n="nav_logout">Выйти</button>
+
+        <!-- Мобильное меню (бутерброд) -->
+        <div id="mobile-menu-wrap" class="relative md:hidden shrink-0">
+          <button type="button" id="mobile-menu-btn" onclick="toggleMobileMenu(event)" aria-expanded="false" aria-haspopup="true" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-800 dark:text-stone-200 transition" title="Меню" data-i18n-title="nav_menu">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+
+          <div id="mobile-menu-dropdown" class="hidden absolute right-0 mt-2 w-60 bg-white dark:bg-[#1a1a1a] border border-stone-200 dark:border-stone-800 shadow-xl py-1.5 z-50 text-xs normal-case tracking-normal">
+            <div class="px-3 py-2 border-b border-stone-200 dark:border-stone-800 flex items-center gap-2 text-stone-500 dark:text-stone-400">
+              <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <span id="mobile-menu-username" class="font-medium text-stone-800 dark:text-stone-200 truncate"></span>
+            </div>
+
+            <div id="mobile-menu-libraries-wrap" class="hidden border-b border-stone-200 dark:border-stone-800 py-1">
+              <div class="px-3 py-1 text-[10px] uppercase tracking-wider text-stone-400" data-i18n="switch_library_title">Выбрать библиотеку</div>
+              <div id="mobile-menu-libraries"></div>
+            </div>
+
+            <div class="py-1">
+              <button type="button" onclick="toggleTheme(); closeMobileMenu();" class="w-full text-left px-3 py-2 flex items-center justify-between text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626] transition">
+                <span data-i18n="nav_theme">Тема</span>
+                <span class="inline-flex items-center">
+                  <svg class="w-3.5 h-3.5 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+                  <svg class="w-3.5 h-3.5 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                </span>
+              </button>
+
+              <button type="button" onclick="toggleLanguage()" class="w-full text-left px-3 py-2 flex items-center justify-between text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626] transition">
+                <span data-i18n="nav_language">Язык</span>
+                <span id="mobile-menu-lang-label" class="font-medium uppercase text-[11px] text-stone-500 dark:text-stone-400">RU</span>
+              </button>
+
+              <button type="button" id="mobile-menu-settings-btn" onclick="closeMobileMenu(); openSettingsModal();" class="hidden w-full text-left px-3 py-2 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626] transition">
+                <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+                <span data-i18n="nav_settings">Настройки</span>
+              </button>
+            </div>
+
+            <div class="border-t border-stone-200 dark:border-stone-800 pt-1">
+              <button type="button" onclick="closeMobileMenu(); handleLogout();" class="w-full text-left px-3 py-2 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#262626] hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="nav_logout">Выйти</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </header>
@@ -610,6 +668,9 @@
         login_btn: 'Войти',
         login_err: 'Неверный логин или пароль',
         nav_home: 'На главную',
+        nav_menu: 'Меню',
+        nav_theme: 'Тема',
+        nav_language: 'Язык',
         nav_settings: 'Настройки',
         nav_logout: 'Выйти',
         search_placeholder: 'Поиск альбома...',
@@ -747,6 +808,9 @@
         login_btn: 'Sign In',
         login_err: 'Invalid username or password',
         nav_home: 'Home',
+        nav_menu: 'Menu',
+        nav_theme: 'Theme',
+        nav_language: 'Language',
         nav_settings: 'Settings',
         nav_logout: 'Logout',
         search_placeholder: 'Search album...',
@@ -931,6 +995,8 @@
       document.documentElement.lang = currentLang;
       document.getElementById('header-lang-btn').textContent = currentLang.toUpperCase();
       document.getElementById('login-lang-btn').textContent = currentLang.toUpperCase();
+      const mobileLangLabel = document.getElementById('mobile-menu-lang-label');
+      if (mobileLangLabel) mobileLangLabel.textContent = currentLang.toUpperCase();
 
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -1133,6 +1199,8 @@
 
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('current-user-badge').textContent = currentUser.username;
+      const mobileUsernameEl = document.getElementById('mobile-menu-username');
+      if (mobileUsernameEl) mobileUsernameEl.textContent = currentUser.username;
 
       const titleText = (appSettings.gallery_title || '').trim();
       document.title = titleText || 'Photo Archive';
@@ -1141,6 +1209,8 @@
 
       if (currentUser.role === 'admin') {
         document.getElementById('settings-btn').classList.remove('hidden');
+        const mobileSettingsBtn = document.getElementById('mobile-menu-settings-btn');
+        if (mobileSettingsBtn) mobileSettingsBtn.classList.remove('hidden');
       }
       if (currentUser && currentUser.default_library) {
         const storedLib = localStorage.getItem('pixie_library');
@@ -1190,10 +1260,37 @@
       if (menu) menu.classList.add('hidden');
     }
 
+    function toggleMobileMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById('mobile-menu-dropdown');
+      const btn = document.getElementById('mobile-menu-btn');
+      if (!menu) return;
+      const isHidden = menu.classList.toggle('hidden');
+      if (btn) btn.setAttribute('aria-expanded', String(!isHidden));
+    }
+
+    function closeMobileMenu() {
+      const menu = document.getElementById('mobile-menu-dropdown');
+      const btn = document.getElementById('mobile-menu-btn');
+      if (menu) menu.classList.add('hidden');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+    }
+
     document.addEventListener('click', (e) => {
       const wrap = document.getElementById('library-switcher-wrap');
       if (wrap && !wrap.contains(e.target)) {
         closeLibraryDropdown();
+      }
+      const mobileWrap = document.getElementById('mobile-menu-wrap');
+      if (mobileWrap && !mobileWrap.contains(e.target)) {
+        closeMobileMenu();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeLibraryDropdown();
+        closeMobileMenu();
       }
     });
 
@@ -1201,10 +1298,14 @@
       const wrap = document.getElementById('library-switcher-wrap');
       const btn = document.getElementById('library-switcher-btn');
       const menu = document.getElementById('library-dropdown-menu');
+      const mobileWrap = document.getElementById('mobile-menu-libraries-wrap');
+      const mobileList = document.getElementById('mobile-menu-libraries');
       if (!wrap || !btn || !menu) return;
 
       if (!availableLibraries || availableLibraries.length <= 1) {
         wrap.classList.add('hidden');
+        if (mobileWrap) mobileWrap.classList.add('hidden');
+        if (mobileList) mobileList.innerHTML = '';
         return;
       }
 
@@ -1212,7 +1313,7 @@
       const activeLib = availableLibraries.find(l => l.id === currentLibraryId) || availableLibraries[0];
       btn.title = `${t('lib_switch_title')}: ${activeLib ? activeLib.name : ''}`;
 
-      menu.innerHTML = availableLibraries.map(lib => {
+      const itemsHtml = availableLibraries.map(lib => {
         const isActive = lib.id === currentLibraryId;
         const safeId = lib.id.replace(/'/g, "\\'");
         return `
@@ -1222,10 +1323,17 @@
           </button>
         `;
       }).join('');
+
+      menu.innerHTML = itemsHtml;
+      if (mobileWrap && mobileList) {
+        mobileWrap.classList.remove('hidden');
+        mobileList.innerHTML = itemsHtml;
+      }
     }
 
     async function switchLibrary(libId) {
       closeLibraryDropdown();
+      closeMobileMenu();
       if (libId === currentLibraryId && currentAlbumPath === '') return;
       currentLibraryId = libId;
       currentMediaTypeFilter = 'all';
