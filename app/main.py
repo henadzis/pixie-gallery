@@ -1673,10 +1673,8 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
     admin_catalog = []
     if user["role"] == "admin":
         all_libs = get_libraries_list(db)
-        multi = len(all_libs) > 1
         for lobj in all_libs:
             lid = lobj.get("id", "default")
-            lname = lobj.get("name", lid)
             try:
                 _, lroot, _ = get_library_root(lid, db)
             except Exception:
@@ -1688,12 +1686,10 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
             for y in lyears:
                 for alb in y["albums"]:
                     perm_key = alb["path"] if lid == "default" else f"{lid}::{alb['path']}"
-                    disp_label = f"[{lname}] {alb['path']}" if multi else alb["path"]
-                    disp_name = f"[{lname}] {alb['name']}" if multi else alb["name"]
                     admin_catalog.append({
                         "path": perm_key,
-                        "label": disp_label,
-                        "name": disp_name,
+                        "label": alb["path"],
+                        "name": alb["name"],
                         "lib_id": lid,
                         "rel_path": alb["path"]
                     })

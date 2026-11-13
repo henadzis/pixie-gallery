@@ -9,12 +9,18 @@ services:
     ports:
       - "8085:8000"
     volumes:
-      - /DATA/AppData/pixie-gallery/app:/code/app
-      - /DATA/Media/Photos:/photos:ro
+      # Кэш миниатюр, базы настроек (config_db.json, exif_cache.json) и перекодированные видео
       - /DATA/AppData/pixie-gallery/cache:/cache
+      # Временные файлы
+      - /DATA/AppData/pixie-gallery/tmp:/tmp
+      # Основная библиотека фотографий
+      - /DATA/Media/Photos:/photos:ro
+      # Общий каталог медиа для подключения дополнительных библиотек в настройках (/media/...)
+      - /DATA/Media:/media:ro
     environment:
       - PHOTOS_DIR=/photos
       - CACHE_DIR=/cache
+      - TMPDIR=/tmp
       - GALLERY_TITLE=PORTFOLIO & ARCHIVE
       - ADMIN_USER=admin
       - ADMIN_PASS=admin123
@@ -25,7 +31,7 @@ services:
       author: self
       category: Gallery
       hostname: ""
-      icon: https://cdn-icons-png.flaticon.com/512/3342/3342137.png
+      icon: https://raw.githubusercontent.com/henadzis/pixie-gallery/main/pixie_gallery.svg
       index: /
       port_map: "8085"
       scheme: http
