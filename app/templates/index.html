@@ -870,40 +870,44 @@
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <input id="new-u-name" type="text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-i18n-placeholder="user_ph_login" placeholder="Логин" required class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
                   <input id="new-u-pass" type="password" autocomplete="new-password" data-i18n-placeholder="user_ph_pass" placeholder="Пароль" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-                  <select id="new-u-role" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                  <select id="new-u-role" onchange="toggleUserRolePermissions()" class="border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
                     <option value="user" data-i18n="role_user">Клиент</option>
                     <option value="admin" data-i18n="role_admin">Администратор</option>
                   </select>
                 </div>
 
-                <div class="space-y-2">
-                  <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
-                  <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
-                </div>
+                <div id="admin-full-access-note" class="hidden text-xs text-stone-500 dark:text-stone-400 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 p-3" data-i18n="admin_full_access_note">У администратора всегда полный доступ ко всем библиотекам и папкам.</div>
 
-                <div class="space-y-1">
-                  <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
-                  <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-                    <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
-                  </select>
-                </div>
-
-                <div class="space-y-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
-                    <div class="flex items-center space-x-4">
-                      <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
-                        <input type="radio" name="access-mode" value="allow" checked onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
-                        <span data-i18n="mode_allow">Разрешенные папки</span>
-                      </label>
-                      <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
-                        <input type="radio" name="access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
-                        <span data-i18n="mode_deny">Запрещенные папки</span>
-                      </label>
-                    </div>
+                <div id="user-permissions-wrap" class="space-y-4">
+                  <div class="space-y-2">
+                    <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
+                    <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
                   </div>
-                  <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2.5 text-xs">
-                    <span id="selected-albums-summary" class="text-stone-600 dark:text-stone-300 font-medium">...</span>
-                    <button type="button" onclick="openAlbumPicker()" class="border border-stone-800 dark:border-stone-300 px-3 py-1.5 text-xs tracking-wider uppercase hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition" data-i18n="btn_configure_albums">Настроить папки…</button>
+
+                  <div class="space-y-1">
+                    <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
+                    <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                      <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
+                    </select>
+                  </div>
+
+                  <div class="space-y-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 dark:border-stone-700 pb-2 text-xs uppercase tracking-wider">
+                      <div class="flex items-center space-x-4">
+                        <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                          <input type="radio" name="access-mode" value="allow" checked onchange="setUserMode('allow')" class="accent-stone-900 dark:accent-stone-100" />
+                          <span data-i18n="mode_allow">Разрешенные папки</span>
+                        </label>
+                        <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
+                          <input type="radio" name="access-mode" value="deny" onchange="setUserMode('deny')" class="accent-stone-900 dark:accent-stone-100" />
+                          <span data-i18n="mode_deny">Запрещенные папки</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2.5 text-xs">
+                      <span id="selected-albums-summary" class="text-stone-600 dark:text-stone-300 font-medium">...</span>
+                      <button type="button" onclick="openAlbumPicker()" class="border border-stone-800 dark:border-stone-300 px-3 py-1.5 text-xs tracking-wider uppercase hover:bg-stone-900 hover:text-white dark:hover:bg-stone-100 dark:hover:text-stone-900 transition" data-i18n="btn_configure_albums">Настроить папки…</button>
+                    </div>
                   </div>
                 </div>
 
@@ -921,7 +925,7 @@
 
   <!-- МОДАЛЬНОЕ ОКНО ВЫБОРА ПАПОК / АЛЬБОМОВ ДЛЯ ПОЛЬЗОВАТЕЛЯ -->
   <div id="album-picker-modal" class="fixed inset-0 z-[60] hidden bg-black/60 backdrop-blur-xs flex items-center justify-center sm:p-4">
-    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-3xl w-full h-[100dvh] sm:h-[82vh] sm:max-h-[82vh] flex flex-col shadow-2xl overflow-hidden">
+    <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-4xl w-full h-[100dvh] sm:h-[84vh] sm:max-h-[84vh] flex flex-col shadow-2xl overflow-hidden">
       <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 px-5 py-4 shrink-0">
         <h3 class="serif-title text-lg sm:text-xl tracking-[0.12em] uppercase" data-i18n="album_picker_title">Доступ к папкам и альбомам</h3>
         <button type="button" onclick="closeAlbumPicker(false)" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
@@ -929,7 +933,7 @@
         </button>
       </div>
 
-      <div class="px-5 py-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#141414] space-y-3 shrink-0">
+      <div class="px-5 py-3 border-b border-stone-200 dark:border-stone-800 bg-stone-50 dark:bg-[#141414] space-y-2.5 shrink-0">
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex items-center space-x-4 text-xs uppercase tracking-wider">
             <label class="cursor-pointer flex items-center space-x-1.5 font-semibold">
@@ -946,10 +950,16 @@
             <span>★ <span data-i18n="all_albums_star">ВСЕ АЛЬБОМЫ (*)</span></span>
           </label>
         </div>
-        <input id="album-picker-search" type="text" oninput="renderAlbumPickerGroups()" data-i18n-placeholder="album_picker_search_ph" placeholder="Поиск папки или альбома..." class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+
+        <div id="picker-libs-bar" class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs pt-1 border-t border-stone-200/80 dark:border-stone-800"></div>
+
+        <input id="album-picker-search" type="text" oninput="renderAlbumPickerUI()" data-i18n-placeholder="album_picker_search_ph" placeholder="Поиск папки или альбома..." class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
       </div>
 
-      <div id="album-picker-groups" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-5 space-y-4 text-xs"></div>
+      <div class="flex-1 flex flex-col md:flex-row min-h-0 min-w-0 overflow-hidden">
+        <nav id="album-picker-tabs" class="flex md:flex-col gap-1.5 px-4 py-2.5 md:p-3 border-b md:border-b-0 md:border-r border-stone-200 dark:border-stone-800 overflow-x-auto md:overflow-x-hidden md:overflow-y-auto md:w-56 shrink-0 min-w-0 bg-stone-50/60 dark:bg-[#141414]"></nav>
+        <div id="album-picker-content" class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-4 sm:p-5 text-xs"></div>
+      </div>
 
       <div class="flex items-center justify-between border-t border-stone-200 dark:border-stone-800 px-5 py-3.5 shrink-0 bg-stone-50 dark:bg-[#141414]">
         <span id="album-picker-count" class="text-xs text-stone-600 dark:text-stone-400">...</span>
@@ -1081,6 +1091,8 @@
         btn_clear_all: 'Снять все',
         btn_done: 'Готово',
         album_picker_empty: 'Нет доступных папок по заданному фильтру',
+        admin_full_access_note: 'У администратора всегда полный доступ ко всем библиотекам и папкам.',
+        picker_no_libs_selected: 'Выберите хотя бы одну библиотеку выше.',
         tab_maintenance: 'Обслуживание',
         tab_users: 'Пользователи',
         cache_thumbs_label: 'Превью (.webp)',
@@ -1271,6 +1283,8 @@
         btn_clear_all: 'Clear All',
         btn_done: 'Done',
         album_picker_empty: 'No folders match the filter',
+        admin_full_access_note: 'Administrators always have full access to all libraries and folders.',
+        picker_no_libs_selected: 'Select at least one library above.',
         tab_maintenance: 'Maintenance',
         tab_users: 'Users',
         cache_thumbs_label: 'Previews (.webp)',
@@ -3252,6 +3266,18 @@
     let selectedUserAlbums = [];
     let pickerDraftAlbums = new Set();
     let pickerDraftAll = false;
+    let pickerDraftLibs = new Set();
+    let pickerDraftAllLibs = true;
+    let activePickerLibId = null;
+
+    function toggleUserRolePermissions() {
+      const role = document.getElementById('new-u-role')?.value || 'user';
+      const isAdminRole = role === 'admin';
+      const wrap = document.getElementById('user-permissions-wrap');
+      const note = document.getElementById('admin-full-access-note');
+      if (wrap) wrap.classList.toggle('hidden', isAdminRole);
+      if (note) note.classList.toggle('hidden', !isAdminRole);
+    }
 
     function updateSelectedAlbumsSummary() {
       const el = document.getElementById('selected-albums-summary');
@@ -3269,15 +3295,28 @@
       selectedUserAlbums = Array.isArray(selectedAlbums) ? [...selectedAlbums] : [];
       setUserMode(mode);
       updateSelectedAlbumsSummary();
+      toggleUserRolePermissions();
     }
 
-    function _getPickerAllowedLibIds() {
-      const checkedLibsRaw = Array.from(document.querySelectorAll('.lib-cb:checked')).map(cb => cb.value);
+    function _syncLibsFromFormToPicker() {
+      const checkedLibsRaw = Array.from(document.querySelectorAll('#libraries-checkbox-list .lib-cb:checked')).map(cb => cb.value);
       const specific = checkedLibsRaw.filter(v => v !== '*');
       if (checkedLibsRaw.includes('*') || specific.length === 0) {
-        return null;
+        pickerDraftAllLibs = true;
+        pickerDraftLibs = new Set(adminLibraries.map(l => l.id));
+      } else {
+        pickerDraftAllLibs = false;
+        pickerDraftLibs = new Set(specific);
       }
-      return new Set(specific);
+    }
+
+    function _syncLibsFromPickerToForm() {
+      const allLibs = adminLibraries.map(l => l.id);
+      const sel = pickerDraftAllLibs || pickerDraftLibs.size === allLibs.length
+        ? ['*']
+        : Array.from(pickerDraftLibs);
+      const defVal = document.getElementById('new-u-default-lib')?.value || '';
+      renderLibraryCheckboxes(sel, defVal);
     }
 
     function updateAlbumPickerCount() {
@@ -3295,12 +3334,17 @@
     function openAlbumPicker() {
       pickerDraftAll = selectedUserAlbums.includes('*');
       pickerDraftAlbums = new Set(selectedUserAlbums.filter(v => v !== '*'));
+      _syncLibsFromFormToPicker();
+      const firstLib = adminLibraries.find(l => pickerDraftAllLibs || pickerDraftLibs.has(l.id));
+      activePickerLibId = firstLib ? firstLib.id : null;
+
       const allCb = document.getElementById('picker-all-albums-cb');
       if (allCb) allCb.checked = pickerDraftAll;
       const searchEl = document.getElementById('album-picker-search');
       if (searchEl) searchEl.value = '';
       setUserMode(currentUserEditMode);
-      renderAlbumPickerGroups();
+      renderPickerLibsBar();
+      renderAlbumPickerUI();
       updateAlbumPickerCount();
       document.getElementById('album-picker-modal').classList.remove('hidden');
     }
@@ -3308,14 +3352,60 @@
     function closeAlbumPicker(apply = false) {
       if (apply) {
         selectedUserAlbums = pickerDraftAll ? ['*'] : Array.from(pickerDraftAlbums);
+        _syncLibsFromPickerToForm();
         updateSelectedAlbumsSummary();
       }
       document.getElementById('album-picker-modal').classList.add('hidden');
     }
 
+    function renderPickerLibsBar() {
+      const bar = document.getElementById('picker-libs-bar');
+      if (!bar) return;
+      let html = `<label class="inline-flex items-center space-x-1.5 font-semibold cursor-pointer"><input type="checkbox" ${pickerDraftAllLibs ? 'checked' : ''} onchange="togglePickerLibStar(this.checked)" class="accent-stone-900 dark:accent-stone-100" /><span>★ ${t('all_libs_star')}</span></label>`;
+      for (const lib of adminLibraries) {
+        const isChecked = pickerDraftAllLibs || pickerDraftLibs.has(lib.id);
+        const safeId = lib.id.replace(/'/g, "\\'");
+        html += `<label class="inline-flex items-center space-x-1.5 cursor-pointer"><input type="checkbox" ${isChecked ? 'checked' : ''} onchange="togglePickerSingleLib('${safeId}', this.checked)" class="accent-stone-900 dark:accent-stone-100" /><span>${lib.name}</span></label>`;
+      }
+      bar.innerHTML = html;
+    }
+
+    function togglePickerLibStar(checked) {
+      pickerDraftAllLibs = checked;
+      if (checked) {
+        pickerDraftLibs = new Set(adminLibraries.map(l => l.id));
+      } else {
+        pickerDraftLibs.clear();
+      }
+      renderPickerLibsBar();
+      renderAlbumPickerUI();
+    }
+
+    function togglePickerSingleLib(libId, checked) {
+      if (pickerDraftAllLibs && !checked) {
+        pickerDraftAllLibs = false;
+        pickerDraftLibs = new Set(adminLibraries.map(l => l.id));
+      }
+      if (checked) {
+        pickerDraftLibs.add(libId);
+      } else {
+        pickerDraftLibs.delete(libId);
+      }
+      if (pickerDraftLibs.size === adminLibraries.length && adminLibraries.length > 0) {
+        pickerDraftAllLibs = true;
+      }
+      renderPickerLibsBar();
+      renderAlbumPickerUI();
+    }
+
+    function switchPickerLibTab(libId) {
+      activePickerLibId = libId;
+      renderAlbumPickerUI();
+    }
+
     function togglePickerAllAlbums(checked) {
       pickerDraftAll = checked;
-      renderAlbumPickerGroups();
+      renderAlbumPickerUI();
       updateAlbumPickerCount();
     }
 
@@ -3324,10 +3414,9 @@
         pickerDraftAll = false;
         const allCb = document.getElementById('picker-all-albums-cb');
         if (allCb) allCb.checked = false;
-        const allowedLibIds = _getPickerAllowedLibIds();
         pickerDraftAlbums = new Set(
           allAlbumsCatalog
-            .filter(a => !allowedLibIds || allowedLibIds.has(a.lib_id || 'default'))
+            .filter(a => pickerDraftAllLibs || pickerDraftLibs.has(a.lib_id || 'default'))
             .map(a => a.path)
         );
       }
@@ -3349,62 +3438,83 @@
           else pickerDraftAlbums.delete(a.path);
         }
       }
-      renderAlbumPickerGroups();
+      renderAlbumPickerUI();
       updateAlbumPickerCount();
     }
 
-    function renderAlbumPickerGroups() {
-      const container = document.getElementById('album-picker-groups');
-      if (!container) return;
+    function renderAlbumPickerUI() {
+      const tabsEl = document.getElementById('album-picker-tabs');
+      const contentEl = document.getElementById('album-picker-content');
+      if (!tabsEl || !contentEl) return;
+
       const q = (document.getElementById('album-picker-search')?.value || '').trim().toLowerCase();
-      const allowedLibIds = _getPickerAllowedLibIds();
+      const visibleLibs = adminLibraries.filter(l => pickerDraftAllLibs || pickerDraftLibs.has(l.id));
 
-      const groups = new Map();
-      for (const a of allAlbumsCatalog) {
-        const lid = a.lib_id || 'default';
-        if (allowedLibIds && !allowedLibIds.has(lid)) continue;
-        const label = (a.name || a.path || '').toLowerCase();
-        const fullLabel = (a.label || '').toLowerCase();
-        if (q && !label.includes(q) && !fullLabel.includes(q)) continue;
-        if (!groups.has(lid)) {
-          groups.set(lid, { name: a.lib_name || lid, items: [] });
-        }
-        groups.get(lid).items.push(a);
-      }
-
-      if (groups.size === 0) {
-        container.innerHTML = `<div class="text-center text-stone-500 py-8">${t('album_picker_empty')}</div>`;
+      if (visibleLibs.length === 0) {
+        activePickerLibId = null;
+        tabsEl.innerHTML = '';
+        contentEl.innerHTML = `<div class="text-center text-stone-500 py-8">${t('picker_no_libs_selected')}</div>`;
         return;
       }
 
-      let html = '';
-      for (const [lid, grp] of groups.entries()) {
-        const safeLid = lid.replace(/'/g, "\\'");
-        html += `
-          <div class="border border-stone-200 dark:border-stone-800 bg-stone-50/70 dark:bg-[#141414]">
-            <div class="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-stone-200 dark:border-stone-800 bg-stone-100/80 dark:bg-[#1e1e1e]">
-              <span class="font-semibold uppercase tracking-wider text-[11px] text-stone-700 dark:text-stone-300">${grp.name} (${grp.items.length})</span>
-              <div class="flex items-center gap-2 text-[11px]">
-                <button type="button" onclick="togglePickerLibAll('${safeLid}', true)" class="text-stone-600 dark:text-stone-300 hover:underline">${t('btn_select_all')}</button>
-                <span class="text-stone-300 dark:text-stone-600">|</span>
-                <button type="button" onclick="togglePickerLibAll('${safeLid}', false)" class="text-stone-600 dark:text-stone-300 hover:underline">${t('btn_clear_all')}</button>
-              </div>
-            </div>
-            <div class="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      if (!activePickerLibId || !visibleLibs.some(l => l.id === activePickerLibId)) {
+        activePickerLibId = visibleLibs[0].id;
+      }
+
+      const itemsByLib = new Map();
+      for (const lib of visibleLibs) itemsByLib.set(lib.id, []);
+      for (const a of allAlbumsCatalog) {
+        const lid = a.lib_id || 'default';
+        if (!itemsByLib.has(lid)) continue;
+        const label = (a.name || a.path || '').toLowerCase();
+        const fullLabel = (a.label || '').toLowerCase();
+        if (q && !label.includes(q) && !fullLabel.includes(q)) continue;
+        itemsByLib.get(lid).push(a);
+      }
+
+      tabsEl.innerHTML = visibleLibs.map(lib => {
+        const count = (itemsByLib.get(lib.id) || []).length;
+        const isActive = lib.id === activePickerLibId;
+        const safeId = lib.id.replace(/'/g, "\\'");
+        return `
+          <button type="button" onclick="switchPickerLibTab('${safeId}')" class="settings-tab-btn ${isActive ? 'active' : ''} whitespace-nowrap md:whitespace-normal leading-snug flex items-center justify-between gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <span class="truncate">${lib.name}</span>
+            <span class="text-[10px] opacity-75 shrink-0">(${count})</span>
+          </button>
         `;
-        for (const a of grp.items) {
+      }).join('');
+
+      const activeLib = visibleLibs.find(l => l.id === activePickerLibId);
+      const activeItems = itemsByLib.get(activePickerLibId) || [];
+      const safeActiveId = activePickerLibId.replace(/'/g, "\\'");
+
+      let html = `
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-stone-200 dark:border-stone-800">
+          <div class="font-semibold uppercase tracking-wider text-stone-700 dark:text-stone-300">${activeLib ? activeLib.name : activePickerLibId} (${activeItems.length})</div>
+          <div class="flex items-center gap-2 text-[11px]">
+            <button type="button" onclick="togglePickerLibAll('${safeActiveId}', true)" class="border border-stone-300 dark:border-stone-700 px-2.5 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 transition">${t('btn_select_all')}</button>
+            <button type="button" onclick="togglePickerLibAll('${safeActiveId}', false)" class="border border-stone-300 dark:border-stone-700 px-2.5 py-1 hover:bg-stone-100 dark:hover:bg-stone-800 transition">${t('btn_clear_all')}</button>
+          </div>
+        </div>
+      `;
+
+      if (activeItems.length === 0) {
+        html += `<div class="text-center text-stone-500 py-8">${t('album_picker_empty')}</div>`;
+      } else {
+        html += `<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">`;
+        for (const a of activeItems) {
           const isChecked = pickerDraftAll || pickerDraftAlbums.has(a.path);
           const safePath = a.path.replace(/'/g, "\\'");
           html += `
-            <label class="flex items-center space-x-2 truncate cursor-pointer hover:text-black dark:hover:text-white">
+            <label class="flex items-center space-x-2 truncate cursor-pointer p-1.5 border border-transparent hover:border-stone-200 dark:hover:border-stone-800 hover:bg-stone-50 dark:hover:bg-[#202020]">
               <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="togglePickerAlbumItem('${safePath}', this.checked)" class="accent-stone-900 dark:accent-stone-100 shrink-0" />
               <span class="truncate" title="${a.label}">${a.name || a.path}</span>
             </label>
           `;
         }
-        html += `</div></div>`;
+        html += `</div>`;
       }
-      container.innerHTML = html;
+      contentEl.innerHTML = html;
     }
 
     let adminUsersList = [];
