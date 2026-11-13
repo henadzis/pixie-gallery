@@ -17,9 +17,12 @@ services:
       - /DATA/Media/Photos:/photos:ro
       # Общий каталог медиа для подключения дополнительных библиотек в настройках (/media/...)
       - /DATA/Media:/media:ro
+      # Папка для выгрузки подготовленных ZIP-архивов на NAS
+      - /DATA/Media/Exports:/exports
     environment:
       - PHOTOS_DIR=/photos
       - CACHE_DIR=/cache
+      - EXPORTS_DIR=/exports
       - TMPDIR=/tmp
       - GALLERY_TITLE=PORTFOLIO & ARCHIVE
       - ADMIN_USER=admin

@@ -44,6 +44,7 @@ DEFAULT_VIDEO_CACHE_MAX_GB = max(0.0, float(os.getenv("VIDEO_CACHE_MAX_GB", "5")
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_CACHE_DIR = CACHE_DIR / "transcoded"
 VIDEO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+EXPORTS_DIR = Path(os.getenv("EXPORTS_DIR", str(CACHE_DIR / "exports"))).resolve()
 DB_FILE = CACHE_DIR / "config_db.json"
 EXIF_CACHE_FILE = CACHE_DIR / "exif_cache.json"
 VIDEO_META_CACHE_FILE = CACHE_DIR / "video_meta_cache.json"
@@ -71,6 +72,19 @@ pregen_status = {
     "current_file": ""
 }
 pregen_lock = threading.Lock()
+
+export_status = {
+    "running": False,
+    "cancel_requested": False,
+    "total": 0,
+    "processed": 0,
+    "current_file": "",
+    "current_part": 0,
+    "username": "",
+    "created_files": [],
+    "error": ""
+}
+export_lock = threading.Lock()
 db_lock = threading.Lock()
 exif_lock = threading.Lock()
 cleanup_lock = threading.Lock()
@@ -1508,6 +1522,229 @@ def cancel_pregenerate(user: dict = Depends(get_current_user)):
 def get_pregenerate_status(user: dict = Depends(get_current_user)):
     res = pregen_status.copy()
     res.update(get_cache_size_breakdown())
+    return res
+
+
+class ExportFavoritesRequest(BaseModel):
+    username: str
+    lib: str = "all"
+    media_type: str = "all"
+    max_part_gb: float = 2.0
+
+
+def _collect_user_favorites_for_export(
+    target_username: str,
+    lib_scope: str,
+    media_type: str,
+    db: dict
+) -> list[tuple[Path, str]]:
+    """Collect (orig_path, arcname) pairs for a user's favorite files."""
+    ex_exts, ex_masks, _ = get_filter_rules(db)
+    user_favs = db.get("favorites", {}).get(target_username, [])
+    items = []
+    for fk in sorted(user_favs):
+        if "::" in fk:
+            lib_id, rel_path = fk.split("::", 1)
+        else:
+            lib_id, rel_path = "default", fk
+
+        if lib_scope != "all" and lib_id != lib_scope:
+            continue
+
+        try:
+            orig_path = safe_resolve(rel_path, lib_id, db)
+        except HTTPException:
+            continue
+        if not orig_path.is_file() or not is_valid_media(orig_path, ex_exts, ex_masks):
+            continue
+
+        ext = orig_path.suffix.lower()
+        if media_type == "photo" and ext not in SUPPORTED_IMAGE_EXTS:
+            continue
+        if media_type == "video" and ext not in SUPPORTED_VIDEO_EXTS:
+            continue
+
+        arcname = f"{lib_id}/{rel_path}" if lib_scope == "all" else rel_path
+        items.append((orig_path, arcname))
+    return items
+
+
+def run_export_favorites_task(
+    items: list[tuple[Path, str]],
+    username: str,
+    lib_scope: str,
+    media_type: str,
+    max_part_gb: float
+):
+    """Write user's favorite media files into uncompressed (ZIP_STORED) part archives in EXPORTS_DIR."""
+    global export_status
+    created_files = []
+    zf = None
+    current_tmp_path = None
+    current_final_path = None
+
+    try:
+        EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y-%m-%d_%H-%M-%S")
+        safe_user = re.sub(r"[^a-zA-Z0-9_.-]+", "_", username).strip("_") or "user"
+        safe_lib = re.sub(r"[^a-zA-Z0-9_.-]+", "_", lib_scope).strip("_") or "all"
+        safe_type = media_type if media_type in ("all", "photo", "video") else "all"
+        base_name = f"{safe_user}_{safe_lib}_favorites_{safe_type}_{ts}"
+
+        max_bytes = int(max_part_gb * (1024 ** 3)) if max_part_gb > 0 else 0
+        part_idx = 1
+        current_part_bytes = 0
+
+        def _open_part(idx: int):
+            nonlocal zf, current_tmp_path, current_final_path
+            current_tmp_path = EXPORTS_DIR / f".{base_name}_part{idx}.zip.tmp"
+            current_final_path = EXPORTS_DIR / f"{base_name}_part{idx}.zip"
+            zf = zipfile.ZipFile(current_tmp_path, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
+
+        def _close_part():
+            nonlocal zf, current_tmp_path, current_final_path
+            if zf is not None:
+                zf.close()
+                zf = None
+            if current_tmp_path and current_tmp_path.exists() and current_final_path:
+                current_tmp_path.replace(current_final_path)
+                created_files.append(current_final_path)
+            current_tmp_path = None
+            current_final_path = None
+
+        for idx, (orig_path, arcname) in enumerate(items, start=1):
+            with export_lock:
+                if export_status["cancel_requested"]:
+                    break
+                export_status["current_file"] = orig_path.name
+                export_status["current_part"] = part_idx
+
+            try:
+                fsize = orig_path.stat().st_size
+                if zf is not None and max_bytes > 0 and current_part_bytes > 0 and (current_part_bytes + fsize > max_bytes):
+                    _close_part()
+                    part_idx += 1
+                    current_part_bytes = 0
+
+                if zf is None:
+                    with export_lock:
+                        export_status["current_part"] = part_idx
+                    _open_part(part_idx)
+
+                zf.write(orig_path, arcname=arcname)
+                current_part_bytes += fsize
+            except Exception as exc:
+                with export_lock:
+                    export_status["error"] = str(exc)
+
+            with export_lock:
+                export_status["processed"] = idx
+
+            if idx % 25 == 0:
+                gc.collect()
+
+        with export_lock:
+            canceled = export_status["cancel_requested"]
+
+        if canceled:
+            if zf is not None:
+                zf.close()
+                zf = None
+            if current_tmp_path and current_tmp_path.exists():
+                current_tmp_path.unlink(missing_ok=True)
+        else:
+            _close_part()
+            if len(created_files) == 1:
+                only_file = created_files[0]
+                single_name = EXPORTS_DIR / f"{base_name}.zip"
+                only_file.replace(single_name)
+                created_files[0] = single_name
+
+        with export_lock:
+            export_status["created_files"] = [p.name for p in created_files]
+            export_status["running"] = False
+            export_status["cancel_requested"] = False
+            export_status["current_file"] = "CANCELED" if canceled else "DONE"
+    except Exception as exc:
+        if zf is not None:
+            try:
+                zf.close()
+            except Exception:
+                pass
+        if current_tmp_path and current_tmp_path.exists():
+            try:
+                current_tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+        with export_lock:
+            export_status["error"] = str(exc)
+            export_status["running"] = False
+            export_status["cancel_requested"] = False
+            export_status["current_file"] = "ERROR"
+    finally:
+        gc.collect()
+
+
+@app.post("/api/exports/favorites")
+def start_export_favorites(
+    req: ExportFavoritesRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user)
+):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = load_db()
+    target_user = req.username.strip()
+    if target_user not in db.get("users", {}):
+        raise HTTPException(status_code=404, detail="User not found")
+
+    items = _collect_user_favorites_for_export(target_user, req.lib, req.media_type, db)
+    if not items:
+        raise HTTPException(status_code=404, detail="No favorite media files to export")
+
+    max_part_gb = max(0.0, float(req.max_part_gb or 0.0))
+
+    with export_lock:
+        if export_status["running"]:
+            return {"status": "already_running", "progress": export_status.copy()}
+        export_status["running"] = True
+        export_status["cancel_requested"] = False
+        export_status["total"] = len(items)
+        export_status["processed"] = 0
+        export_status["current_file"] = "PREPARING"
+        export_status["current_part"] = 1
+        export_status["username"] = target_user
+        export_status["created_files"] = []
+        export_status["error"] = ""
+
+    background_tasks.add_task(
+        run_export_favorites_task,
+        items,
+        target_user,
+        req.lib,
+        req.media_type,
+        max_part_gb
+    )
+    return {"status": "started", "progress": export_status.copy()}
+
+
+@app.post("/api/exports/cancel")
+def cancel_export_favorites(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    with export_lock:
+        export_status["cancel_requested"] = True
+        export_status["running"] = False
+    return {"status": "canceled"}
+
+
+@app.get("/api/exports/status")
+def get_export_status(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    with export_lock:
+        res = export_status.copy()
+    res["exports_dir"] = str(EXPORTS_DIR)
     return res
 
 

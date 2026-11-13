@@ -568,6 +568,10 @@
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span data-i18n="tab_users">Пользователи</span>
           </button>
+          <button type="button" data-settings-tab="exports" onclick="switchSettingsTab('exports')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span data-i18n="tab_exports">Экспорт</span>
+          </button>
         </nav>
 
         <div class="flex-1 min-w-0 overflow-y-auto overflow-x-hidden p-5 md:p-6 space-y-6">
@@ -878,17 +882,17 @@
 
                 <div id="admin-full-access-note" class="hidden text-xs text-stone-500 dark:text-stone-400 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 p-3" data-i18n="admin_full_access_note">У администратора всегда полный доступ ко всем библиотекам и папкам.</div>
 
+                <div class="space-y-1">
+                  <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
+                  <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                    <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
+                  </select>
+                </div>
+
                 <div id="user-permissions-wrap" class="space-y-4">
                   <div class="space-y-2">
                     <div class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_allowed_libs">Доступные библиотеки</div>
                     <div id="libraries-checkbox-list" class="border border-stone-200 dark:border-stone-700 bg-white dark:bg-[#121212] p-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-xs"></div>
-                  </div>
-
-                  <div class="space-y-1">
-                    <label for="new-u-default-lib" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="user_default_lib">Библиотека по умолчанию</label>
-                    <select id="new-u-default-lib" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
-                      <option value="" data-i18n="lib_default_auto">Автоматически (первая доступная)</option>
-                    </select>
                   </div>
 
                   <div class="space-y-2">
@@ -916,6 +920,71 @@
                   <button type="button" id="btn-cancel-user-edit" onclick="resetUserForm()" class="hidden border border-stone-300 dark:border-stone-700 px-3 py-2 text-xs uppercase transition" data-i18n="btn_cancel">Отмена</button>
                 </div>
               </form>
+            </div>
+          </div>
+
+          <!-- ВКЛАДКА 7: ЭКСПОРТ НА NAS -->
+          <div id="settings-panel-exports" class="settings-tab-panel hidden space-y-4">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between gap-2">
+                <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_exports">Подготовка ZIP-архивов на NAS</h3>
+              </div>
+
+              <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
+                <p class="text-xs text-stone-500 dark:text-stone-400 leading-relaxed" data-i18n="exports_desc">Собирает все избранные файлы выбранного пользователя в ZIP-архивы без сжатия (уровень 0) и сохраняет их в папку экспорта на NAS. При превышении лимита архив автоматически разбивается на независимые части.</p>
+
+                <div class="text-xs text-stone-600 dark:text-stone-300 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2 flex flex-wrap items-center gap-2">
+                  <span class="font-semibold uppercase tracking-wider text-stone-500" data-i18n="exports_dir_label">Папка на сервере:</span>
+                  <code id="export-dir-path" class="font-mono text-[11px] break-all">/exports</code>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div class="space-y-1">
+                    <label for="export-user-select" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_user_label">Пользователь</label>
+                    <select id="export-user-select" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs"></select>
+                  </div>
+
+                  <div class="space-y-1">
+                    <label for="export-lib-select" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_lib_label">Библиотека</label>
+                    <select id="export-lib-select" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs"></select>
+                  </div>
+
+                  <div class="space-y-1">
+                    <label for="export-media-select" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_media_label">Тип медиа</label>
+                    <select id="export-media-select" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                      <option value="all" data-i18n="exports_media_all">Все (фото и видео)</option>
+                      <option value="photo" data-i18n="exports_media_photo">Только фото</option>
+                      <option value="video" data-i18n="exports_media_video">Только видео</option>
+                    </select>
+                  </div>
+
+                  <div class="space-y-1">
+                    <label for="export-part-gb" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_part_gb_label">Макс. размер части (ГБ, 0 = без разбивки)</label>
+                    <input id="export-part-gb" type="number" min="0" step="0.5" value="2" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 pt-1">
+                  <button type="button" onclick="startExportFavorites()" id="export-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span data-i18n="btn_start_export">Подготовить ZIP на NAS</span>
+                  </button>
+                  <button type="button" onclick="cancelExportFavorites()" id="export-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="6" y="6" width="12" height="12"/></svg>
+                    <span data-i18n="btn_stop">Остановить</span>
+                  </button>
+                  <span id="export-status-text" class="text-xs text-stone-500"></span>
+                </div>
+
+                <div id="export-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
+                  <div id="export-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+
+                <div id="export-result-box" class="hidden text-xs bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 p-3 space-y-1.5">
+                  <div class="font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_created_files">Созданные архивы:</div>
+                  <ul id="export-created-list" class="font-mono text-[11px] text-green-700 dark:text-green-400 space-y-0.5 break-all"></ul>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1095,6 +1164,23 @@
         picker_no_libs_selected: 'Выберите хотя бы одну библиотеку выше.',
         tab_maintenance: 'Обслуживание',
         tab_users: 'Пользователи',
+        tab_exports: 'Экспорт',
+        settings_exports: 'Подготовка ZIP-архивов на NAS',
+        exports_desc: 'Собирает все избранные файлы выбранного пользователя в ZIP-архивы без сжатия (уровень 0) и сохраняет их в папку экспорта на NAS. При превышении лимита архив автоматически разбивается на независимые части.',
+        exports_dir_label: 'Папка на сервере:',
+        exports_user_label: 'Пользователь',
+        exports_lib_label: 'Библиотека',
+        exports_media_label: 'Тип медиа',
+        exports_media_all: 'Все (фото и видео)',
+        exports_media_photo: 'Только фото',
+        exports_media_video: 'Только видео',
+        exports_part_gb_label: 'Макс. размер части (ГБ, 0 = без разбивки)',
+        btn_start_export: 'Подготовить ZIP на NAS',
+        exports_created_files: 'Созданные архивы:',
+        exports_all_libs: 'Все библиотеки',
+        exports_part_short: 'часть',
+        exports_preparing: 'Подготовка...',
+        exports_done: 'Готово',
         cache_thumbs_label: 'Превью (.webp)',
         cache_video_label: 'Рендер видео (.mp4)',
         cache_total_label: 'Всего на диске',
@@ -1287,6 +1373,23 @@
         picker_no_libs_selected: 'Select at least one library above.',
         tab_maintenance: 'Maintenance',
         tab_users: 'Users',
+        tab_exports: 'Exports',
+        settings_exports: 'Prepare ZIP Archives on NAS',
+        exports_desc: 'Packages all favorite files of the selected user into uncompressed (level 0) ZIP archives and saves them to the NAS export folder. Automatically splits into independent parts when exceeding the size limit.',
+        exports_dir_label: 'Server folder:',
+        exports_user_label: 'User',
+        exports_lib_label: 'Library',
+        exports_media_label: 'Media type',
+        exports_media_all: 'All (photos & videos)',
+        exports_media_photo: 'Photos only',
+        exports_media_video: 'Videos only',
+        exports_part_gb_label: 'Max part size (GB, 0 = no split)',
+        btn_start_export: 'Prepare ZIP on NAS',
+        exports_created_files: 'Created archives:',
+        exports_all_libs: 'All libraries',
+        exports_part_short: 'part',
+        exports_preparing: 'Preparing...',
+        exports_done: 'Done',
         cache_thumbs_label: 'Previews (.webp)',
         cache_video_label: 'Video Renders (.mp4)',
         cache_total_label: 'Total on Disk',
@@ -1388,6 +1491,7 @@
     let currentRatio = localStorage.getItem('pixie_ratio') || 'original';
     let currentIndex = 0;
     let pregenPollTimer = null;
+    let exportPollTimer = null;
     let isSidebarCollapsed = false;
     let currentUserEditMode = 'allow';
     let suppressHashEvent = false;
@@ -2947,9 +3051,13 @@
         resetUserForm();
         renderHiddenAlbumsCheckboxes();
         await loadUsersList();
-        await pollPregenStatus();
       }
       document.getElementById('settings-modal').classList.remove('hidden');
+      if (isAdmin) {
+        populateExportOptions();
+        await pollPregenStatus();
+        await pollExportStatus();
+      }
     }
 
     async function clearAllFavorites() {
@@ -3117,7 +3225,14 @@
 
     function closeSettingsModal() {
       document.getElementById('settings-modal').classList.add('hidden');
-      if (pregenPollTimer) clearInterval(pregenPollTimer);
+      if (pregenPollTimer) {
+        clearInterval(pregenPollTimer);
+        pregenPollTimer = null;
+      }
+      if (exportPollTimer) {
+        clearInterval(exportPollTimer);
+        exportPollTimer = null;
+      }
     }
 
     async function saveGalleryTitleOnly() {
@@ -3266,6 +3381,10 @@
         barEl.style.width = `${pct}%`;
         const fileLabel = st.current_file === 'SCANNING' ? t('status_scanning') : st.current_file;
         textEl.textContent = `${st.processed} / ${st.total} (${pct}%) — ${fileLabel}`;
+        const modalEl = document.getElementById('settings-modal');
+        if (!pregenPollTimer && modalEl && !modalEl.classList.contains('hidden')) {
+          pregenPollTimer = setInterval(pollPregenStatus, 1500);
+        }
       } else {
         wrapEl.classList.add('hidden');
         actionBtn.classList.remove('hidden');
@@ -3273,7 +3392,122 @@
         if (textEl.textContent !== t('status_stopping')) {
           textEl.textContent = t('status_ready');
         }
-        if (pregenPollTimer) clearInterval(pregenPollTimer);
+        if (pregenPollTimer) {
+          clearInterval(pregenPollTimer);
+          pregenPollTimer = null;
+        }
+      }
+    }
+
+    function populateExportOptions() {
+      const userSel = document.getElementById('export-user-select');
+      const libSel = document.getElementById('export-lib-select');
+      if (userSel && Array.isArray(adminUsersList)) {
+        const prevUser = userSel.value;
+        userSel.innerHTML = adminUsersList.map(u => {
+          const favCnt = u.favorites_count || 0;
+          return `<option value="${u.username}">${u.username} (${favCnt})</option>`;
+        }).join('');
+        if (prevUser && adminUsersList.some(u => u.username === prevUser)) {
+          userSel.value = prevUser;
+        }
+      }
+      if (libSel && Array.isArray(adminLibraries)) {
+        const prevLib = libSel.value || 'all';
+        let html = `<option value="all">${t('exports_all_libs')}</option>`;
+        for (const lib of adminLibraries) {
+          html += `<option value="${lib.id}">${lib.name}</option>`;
+        }
+        libSel.innerHTML = html;
+        if (prevLib === 'all' || adminLibraries.some(l => l.id === prevLib)) {
+          libSel.value = prevLib;
+        }
+      }
+    }
+
+    async function startExportFavorites() {
+      const username = document.getElementById('export-user-select')?.value;
+      const lib = document.getElementById('export-lib-select')?.value || 'all';
+      const media_type = document.getElementById('export-media-select')?.value || 'all';
+      const maxPartRaw = parseFloat(document.getElementById('export-part-gb')?.value || '2');
+      const max_part_gb = Number.isFinite(maxPartRaw) && maxPartRaw >= 0 ? maxPartRaw : 2;
+      if (!username) return;
+
+      const res = await fetch('/api/exports/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, lib, media_type, max_part_gb })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Error');
+        return;
+      }
+      await pollExportStatus();
+      if (exportPollTimer) clearInterval(exportPollTimer);
+      exportPollTimer = setInterval(pollExportStatus, 1500);
+    }
+
+    async function cancelExportFavorites() {
+      await fetch('/api/exports/cancel', { method: 'POST' });
+      const textEl = document.getElementById('export-status-text');
+      if (textEl) textEl.textContent = t('status_stopping');
+    }
+
+    async function pollExportStatus() {
+      const res = await fetch('/api/exports/status');
+      if (!res.ok) return;
+      const st = await res.json();
+      const dirEl = document.getElementById('export-dir-path');
+      const textEl = document.getElementById('export-status-text');
+      const wrapEl = document.getElementById('export-bar-wrap');
+      const barEl = document.getElementById('export-bar');
+      const actionBtn = document.getElementById('export-action-btn');
+      const cancelBtn = document.getElementById('export-cancel-btn');
+      const resBox = document.getElementById('export-result-box');
+      const resList = document.getElementById('export-created-list');
+
+      if (dirEl && st.exports_dir) dirEl.textContent = st.exports_dir;
+
+      if (st.running) {
+        wrapEl.classList.remove('hidden');
+        actionBtn.classList.add('hidden');
+        cancelBtn.classList.remove('hidden');
+        if (resBox) resBox.classList.add('hidden');
+        const pct = st.total > 0 ? Math.round((st.processed / st.total) * 100) : 0;
+        barEl.style.width = `${pct}%`;
+        const fileLabel = st.current_file === 'PREPARING' ? t('exports_preparing') : st.current_file;
+        const partLabel = st.current_part > 0 ? ` [${t('exports_part_short')} ${st.current_part}]` : '';
+        textEl.textContent = `${st.username}: ${st.processed} / ${st.total} (${pct}%)${partLabel} — ${fileLabel}`;
+        const modalEl = document.getElementById('settings-modal');
+        if (!exportPollTimer && modalEl && !modalEl.classList.contains('hidden')) {
+          exportPollTimer = setInterval(pollExportStatus, 1500);
+        }
+      } else {
+        wrapEl.classList.add('hidden');
+        actionBtn.classList.remove('hidden');
+        cancelBtn.classList.add('hidden');
+        if (st.error) {
+          textEl.textContent = `Error: ${st.error}`;
+        } else if (st.current_file === 'DONE' && Array.isArray(st.created_files) && st.created_files.length > 0) {
+          textEl.textContent = `${t('exports_done')} (${st.processed} / ${st.total})`;
+        } else if (textEl.textContent !== t('status_stopping')) {
+          textEl.textContent = t('status_ready');
+        }
+
+        if (resBox && resList) {
+          if (Array.isArray(st.created_files) && st.created_files.length > 0) {
+            resBox.classList.remove('hidden');
+            resList.innerHTML = st.created_files.map(fn => `<li>• ${fn}</li>`).join('');
+          } else {
+            resBox.classList.add('hidden');
+          }
+        }
+
+        if (exportPollTimer) {
+          clearInterval(exportPollTimer);
+          exportPollTimer = null;
+        }
       }
     }
 
