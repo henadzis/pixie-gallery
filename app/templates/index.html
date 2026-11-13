@@ -789,29 +789,6 @@
                 </div>
               </div>
 
-              <!-- Качество миниатюр (WEBP) -->
-              <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-2.5 sm:col-span-2">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="thumb_quality_title">Качество миниатюр (WEBP)</span>
-                  <span class="pixie-tip">
-                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
-                    <span class="pixie-tip-box" data-i18n="tip_thumb_quality">Качество сжатия WEBP (1–100) для превью 400px и 1200px. Влияет на новые миниатюры; чтобы пересчитать старые, очистите кэш.</span>
-                  </span>
-                </div>
-                <div class="flex flex-wrap items-end gap-3">
-                  <div class="space-y-1">
-                    <label for="opt-thumb-quality-400" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_400_label">400px (по умолч. 80)</label>
-                    <input id="opt-thumb-quality-400" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-                  </div>
-                  <div class="space-y-1">
-                    <label for="opt-thumb-quality-1200" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_1200_label">1200px (по умолч. 85)</label>
-                    <input id="opt-thumb-quality-1200" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
-                  </div>
-                  <button type="button" onclick="saveThumbQualitySettings()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
-                  <span id="thumb-quality-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
-                </div>
-              </div>
-
             </div>
 
             <!-- Единая область очистки (Избранное + Оптимизация кэша + Очистка кэша) -->
@@ -854,27 +831,51 @@
               </div>
             </div>
 
-            <!-- Прегенерация миниатюр -->
-            <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
-              <div class="flex flex-wrap items-center gap-3">
-                <div class="inline-flex items-center gap-1.5">
-                  <button onclick="triggerPregenerate()" id="pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
-                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                    <span data-i18n="btn_pregen">Создать превью (400px / 1200px)</span>
-                  </button>
+            <!-- Качество и прегенерация миниатюр -->
+            <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
+              <div class="space-y-2.5">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="thumb_quality_title">Качество миниатюр (WEBP)</span>
                   <span class="pixie-tip">
                     <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
-                    <span class="pixie-tip-box" data-i18n="tip_pregen">Заранее создаёт миниатюры (400px и 1200px) и кэширует EXIF/видео-метаданные для всех файлов, чтобы галерея открывалась мгновенно.</span>
+                    <span class="pixie-tip-box" data-i18n="tip_thumb_quality">Качество сжатия WEBP (1–100) для превью 400px и 1200px. Влияет на новые миниатюры; чтобы пересчитать старые, очистите кэш.</span>
                   </span>
                 </div>
-                <button onclick="cancelPregenerate()" id="pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
-                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
-                  <span data-i18n="btn_stop">Остановить</span>
-                </button>
-                <span id="pregen-status-text" class="text-xs text-stone-500"></span>
+                <div class="flex flex-wrap items-end gap-3">
+                  <div class="space-y-1">
+                    <label for="opt-thumb-quality-400" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_400_label">400px (по умолч. 80)</label>
+                    <input id="opt-thumb-quality-400" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  </div>
+                  <div class="space-y-1">
+                    <label for="opt-thumb-quality-1200" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_1200_label">1200px (по умолч. 85)</label>
+                    <input id="opt-thumb-quality-1200" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  </div>
+                  <button type="button" onclick="saveThumbQualitySettings()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+                  <span id="thumb-quality-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+                </div>
               </div>
-              <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
-                <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
+
+              <div class="border-t border-stone-200 dark:border-stone-800 pt-3 space-y-3">
+                <div class="flex flex-wrap items-center gap-3">
+                  <div class="inline-flex items-center gap-1.5">
+                    <button onclick="triggerPregenerate()" id="pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                      <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                      <span data-i18n="btn_pregen">Создать превью (400px / 1200px)</span>
+                    </button>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_pregen">Заранее создаёт миниатюры (400px и 1200px) и кэширует EXIF/видео-метаданные для всех файлов, чтобы галерея открывалась мгновенно.</span>
+                    </span>
+                  </div>
+                  <button onclick="cancelPregenerate()" id="pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
+                    <span data-i18n="btn_stop">Остановить</span>
+                  </button>
+                  <span id="pregen-status-text" class="text-xs text-stone-500"></span>
+                </div>
+                <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
+                  <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
+                </div>
               </div>
             </div>
           </div>

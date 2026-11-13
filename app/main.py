@@ -1455,16 +1455,27 @@ def run_all_thumbnails_task():
         for root, dirs, files in os.walk(lib_root):
             if pregen_status["cancel_requested"]:
                 break
-            dirs[:] = [d for d in dirs if not d.startswith(".")]
             current_dir = Path(root)
             if current_dir != lib_root:
                 rel = current_dir.relative_to(lib_root).as_posix()
                 if is_folder_hidden(rel, hidden_folders, lid):
+                    dirs[:] = []
                     continue
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".")
+                and not any(fnmatch(d.lower(), mask) for mask in ex_masks)
+            ]
+            dir_media = []
             for f in files:
                 p = Path(root) / f
                 if is_valid_media(p, ex_exts, ex_masks):
-                    all_images.append(p)
+                    dir_media.append(p)
+            v_stems = {p.stem.lower() for p in dir_media if p.suffix.lower() in SUPPORTED_VIDEO_EXTS}
+            for p in dir_media:
+                if p.suffix.lower() in SUPPORTED_IMAGE_EXTS and p.stem.lower() in v_stems:
+                    continue
+                all_images.append(p)
 
     with pregen_lock:
         pregen_status["total"] = len(all_images)
