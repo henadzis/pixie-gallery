@@ -789,6 +789,29 @@
                 </div>
               </div>
 
+              <!-- Качество миниатюр (WEBP) -->
+              <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-2.5 sm:col-span-2">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="thumb_quality_title">Качество миниатюр (WEBP)</span>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_thumb_quality">Качество сжатия WEBP (1–100) для превью 400px и 1200px. Влияет на новые миниатюры; чтобы пересчитать старые, очистите кэш.</span>
+                  </span>
+                </div>
+                <div class="flex flex-wrap items-end gap-3">
+                  <div class="space-y-1">
+                    <label for="opt-thumb-quality-400" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_400_label">400px (по умолч. 80)</label>
+                    <input id="opt-thumb-quality-400" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  </div>
+                  <div class="space-y-1">
+                    <label for="opt-thumb-quality-1200" class="block text-[11px] uppercase tracking-wider text-stone-500" data-i18n="thumb_quality_1200_label">1200px (по умолч. 85)</label>
+                    <input id="opt-thumb-quality-1200" type="number" min="1" max="100" step="1" class="w-28 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
+                  </div>
+                  <button type="button" onclick="saveThumbQualitySettings()" class="bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2 text-xs uppercase transition" data-i18n="btn_apply">Применить</button>
+                  <span id="thumb-quality-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+                </div>
+              </div>
+
             </div>
 
             <!-- Единая область очистки (Избранное + Оптимизация кэша + Очистка кэша) -->
@@ -959,7 +982,7 @@
                   </div>
 
                   <div class="space-y-1">
-                    <label for="export-part-gb" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_part_gb_label">Макс. размер части (ГБ, 0 = без разбивки)</label>
+                    <label for="export-part-gb" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_part_gb_label">Размер части (ГБ, 0 = 1 файл)</label>
                     <input id="export-part-gb" type="number" min="0" step="0.5" value="2" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
                   </div>
                 </div>
@@ -1174,7 +1197,7 @@
         exports_media_all: 'Все (фото и видео)',
         exports_media_photo: 'Только фото',
         exports_media_video: 'Только видео',
-        exports_part_gb_label: 'Макс. размер части (ГБ, 0 = без разбивки)',
+        exports_part_gb_label: 'Размер части (ГБ, 0 = 1 файл)',
         btn_start_export: 'Подготовить ZIP на NAS',
         exports_created_files: 'Созданные архивы:',
         exports_all_libs: 'Все библиотеки',
@@ -1185,6 +1208,10 @@
         cache_video_label: 'Рендер видео (.mp4)',
         cache_total_label: 'Всего на диске',
         video_cache_limit_label: 'Лимит кэша видео (ГБ)',
+        thumb_quality_title: 'Качество миниатюр (WEBP)',
+        tip_thumb_quality: 'Качество сжатия WEBP (1–100) для превью 400px и 1200px. Влияет на новые миниатюры; чтобы пересчитать старые, очистите кэш.',
+        thumb_quality_400_label: '400px (по умолч. 80)',
+        thumb_quality_1200_label: '1200px (по умолч. 85)',
         btn_optimize_cache: 'Оптимизировать кэш',
         optimizing_cache: 'Оптимизация...',
         optimize_done_prefix: 'Оптимизация завершена: удалено превью',
@@ -1383,7 +1410,7 @@
         exports_media_all: 'All (photos & videos)',
         exports_media_photo: 'Photos only',
         exports_media_video: 'Videos only',
-        exports_part_gb_label: 'Max part size (GB, 0 = no split)',
+        exports_part_gb_label: 'Part size (GB, 0 = 1 file)',
         btn_start_export: 'Prepare ZIP on NAS',
         exports_created_files: 'Created archives:',
         exports_all_libs: 'All libraries',
@@ -1394,6 +1421,10 @@
         cache_video_label: 'Video Renders (.mp4)',
         cache_total_label: 'Total on Disk',
         video_cache_limit_label: 'Video Cache Limit (GB)',
+        thumb_quality_title: 'Thumbnail Quality (WEBP)',
+        tip_thumb_quality: 'WEBP compression quality (1–100) for 400px and 1200px previews. Applies to newly generated thumbnails; clear cache to regenerate existing ones.',
+        thumb_quality_400_label: '400px (default 80)',
+        thumb_quality_1200_label: '1200px (default 85)',
         btn_optimize_cache: 'Optimize Cache',
         optimizing_cache: 'Optimizing...',
         optimize_done_prefix: 'Optimization complete: removed previews',
@@ -3039,10 +3070,16 @@
         if (videoLimitEl) {
           videoLimitEl.value = appSettings.video_cache_max_gb !== undefined ? appSettings.video_cache_max_gb : 5;
         }
+        const q400El = document.getElementById('opt-thumb-quality-400');
+        if (q400El) q400El.value = appSettings.thumb_quality_400 !== undefined ? appSettings.thumb_quality_400 : 80;
+        const q1200El = document.getElementById('opt-thumb-quality-1200');
+        if (q1200El) q1200El.value = appSettings.thumb_quality_1200 !== undefined ? appSettings.thumb_quality_1200 : 85;
         document.getElementById('filter-saved-msg').classList.add('hidden');
         document.getElementById('title-saved-msg').classList.add('hidden');
         const vLimitMsg = document.getElementById('video-limit-saved-msg');
         if (vLimitMsg) vLimitMsg.classList.add('hidden');
+        const tqMsg = document.getElementById('thumb-quality-saved-msg');
+        if (tqMsg) tqMsg.classList.add('hidden');
         const optResMsg = document.getElementById('optimize-result-msg');
         if (optResMsg) optResMsg.classList.add('hidden');
 
@@ -3250,6 +3287,20 @@
           appSettings.video_cache_max_gb = parsedLimit;
         }
       }
+      const q400El = document.getElementById('opt-thumb-quality-400');
+      if (q400El && q400El.value !== '') {
+        const q400 = parseInt(q400El.value, 10);
+        if (!Number.isNaN(q400) && q400 >= 1 && q400 <= 100) {
+          appSettings.thumb_quality_400 = q400;
+        }
+      }
+      const q1200El = document.getElementById('opt-thumb-quality-1200');
+      if (q1200El && q1200El.value !== '') {
+        const q1200 = parseInt(q1200El.value, 10);
+        if (!Number.isNaN(q1200) && q1200 >= 1 && q1200 <= 100) {
+          appSettings.thumb_quality_1200 = q1200;
+        }
+      }
 
       const res = await fetch('/api/settings', {
         method: 'POST',
@@ -3282,6 +3333,15 @@
     async function saveVideoCacheLimit() {
       await saveGalleryTitleOnly();
       const msg = document.getElementById('video-limit-saved-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+    }
+
+    async function saveThumbQualitySettings() {
+      await saveGalleryTitleOnly();
+      const msg = document.getElementById('thumb-quality-saved-msg');
       if (msg) {
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 3000);

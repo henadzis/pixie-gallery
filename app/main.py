@@ -114,6 +114,8 @@ def default_settings_dict() -> dict:
         "hidden_folders": "",
         "show_hidden_albums": False,
         "video_cache_max_gb": DEFAULT_VIDEO_CACHE_MAX_GB,
+        "thumb_quality_400": 80,
+        "thumb_quality_1200": 85,
         "libraries": default_libraries_list()
     }
 
@@ -400,7 +402,14 @@ def user_can_access_image(user: dict, img_rel_path: str, lib_id: str = "default"
     return user_can_access_album(user, parent_album, lib_id)
 
 
-def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
+def _get_thumb_qualities(db: Optional[dict] = None) -> tuple[int, int]:
+    s = (db or load_db()).get("settings", {})
+    q400 = max(1, min(100, int(s.get("thumb_quality_400", 80))))
+    q1200 = max(1, min(100, int(s.get("thumb_quality_1200", 85))))
+    return q400, q1200
+
+
+def generate_cached_thumb(orig_path: Path, size: int = 400, quality: Optional[int] = None) -> Path:
     target_size = 1200 if size >= 1000 else 400
     stat = orig_path.stat()
     cache_key = f"{orig_path}_{stat.st_mtime}_{target_size}".encode("utf-8")
@@ -412,6 +421,11 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
 
     with thumb_semaphore:
         if not cache_file.exists():
+            if quality is None:
+                q400, q1200 = _get_thumb_qualities()
+                webp_quality = q1200 if target_size == 1200 else q400
+            else:
+                webp_quality = max(1, min(100, int(quality)))
             cache_file.parent.mkdir(parents=True, exist_ok=True)
             ext = orig_path.suffix.lower()
             if ext in SUPPORTED_VIDEO_EXTS:
@@ -422,8 +436,7 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
                         if img.mode != "RGB":
                             img = img.convert("RGB")
                         img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
-                        quality = 85 if target_size == 1200 else 80
-                        img.save(cache_file, "WEBP", quality=quality)
+                        img.save(cache_file, "WEBP", quality=webp_quality)
                 else:
                     meta, _ = extract_video_metadata(orig_path)
                     dur = meta.get("duration", 0.0)
@@ -456,8 +469,7 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
                         if frame_img.mode != "RGB":
                             frame_img = frame_img.convert("RGB")
                         frame_img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
-                        quality = 85 if target_size == 1200 else 80
-                        frame_img.save(cache_file, "WEBP", quality=quality)
+                        frame_img.save(cache_file, "WEBP", quality=webp_quality)
                     else:
                         raise RuntimeError(f"Could not extract video thumbnail for {orig_path.name}")
             else:
@@ -471,8 +483,7 @@ def generate_cached_thumb(orig_path: Path, size: int = 400) -> Path:
                     if img.mode != "RGB":
                         img = img.convert("RGB")
                     img.thumbnail((target_size, target_size), Image.Resampling.LANCZOS)
-                    quality = 85 if target_size == 1200 else 80
-                    img.save(cache_file, "WEBP", quality=quality)
+                    img.save(cache_file, "WEBP", quality=webp_quality)
             gc.collect()
     return cache_file
 
@@ -835,6 +846,8 @@ class SettingsUpdateRequest(BaseModel):
     hidden_folders: str = ""
     show_hidden_albums: bool = False
     video_cache_max_gb: Optional[float] = None
+    thumb_quality_400: Optional[int] = None
+    thumb_quality_1200: Optional[int] = None
 
 
 class LibraryUpsertRequest(BaseModel):
@@ -934,6 +947,9 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
     existing_libs = get_libraries_list(db)
     prev_max_gb = db.get("settings", {}).get("video_cache_max_gb", DEFAULT_VIDEO_CACHE_MAX_GB)
     video_cache_max_gb = prev_max_gb if req.video_cache_max_gb is None else max(0.0, float(req.video_cache_max_gb))
+    prev_q400, prev_q1200 = _get_thumb_qualities(db)
+    q400 = prev_q400 if req.thumb_quality_400 is None else max(1, min(100, int(req.thumb_quality_400)))
+    q1200 = prev_q1200 if req.thumb_quality_1200 is None else max(1, min(100, int(req.thumb_quality_1200)))
     db["settings"] = {
         "gallery_title": req.gallery_title.strip(),
         "show_exif": req.show_exif,
@@ -943,6 +959,8 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         "hidden_folders": req.hidden_folders.strip(),
         "show_hidden_albums": req.show_hidden_albums,
         "video_cache_max_gb": video_cache_max_gb,
+        "thumb_quality_400": q400,
+        "thumb_quality_1200": q1200,
         "libraries": existing_libs
     }
     save_db(db)
@@ -1454,14 +1472,15 @@ def run_all_thumbnails_task():
 
     exif_dirty = False
     video_dirty = False
+    q400, q1200 = _get_thumb_qualities(db)
     for idx, img_path in enumerate(all_images, start=1):
         if pregen_status["cancel_requested"]:
             break
         with pregen_lock:
             pregen_status["current_file"] = img_path.name
         try:
-            generate_cached_thumb(img_path, 400)
-            generate_cached_thumb(img_path, 1200)
+            generate_cached_thumb(img_path, 400, quality=q400)
+            generate_cached_thumb(img_path, 1200, quality=q1200)
             if img_path.suffix.lower() in SUPPORTED_VIDEO_EXTS:
                 _, v_up = extract_video_metadata(img_path)
                 if v_up:
