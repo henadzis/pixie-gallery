@@ -172,15 +172,17 @@
           </button>
         </div>
 
-        <button onclick="toggleGridRatio()" id="ratio-toggle-btn" class="hidden lg:inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Grid Aspect Ratio">
-          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="3" width="7" height="7"></rect>
-            <rect x="14" y="3" width="7" height="7"></rect>
-            <rect x="14" y="14" width="7" height="7"></rect>
-            <rect x="3" y="14" width="7" height="7"></rect>
-          </svg>
-          <span id="ratio-toggle-label">Оригинал</span>
-        </button>
+        <div id="ratio-toggle-wrap" class="hidden">
+          <button onclick="toggleGridRatio()" id="ratio-toggle-btn" class="hidden lg:inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Grid Aspect Ratio">
+            <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span id="ratio-toggle-label">Оригинал</span>
+          </button>
+        </div>
 
         <div class="hidden sm:flex items-center space-x-1.5">
           <span class="text-stone-400 hidden xl:inline" data-i18n="cols_label">Столбцы:</span>
@@ -195,10 +197,6 @@
         <button onclick="toggleTheme()" id="header-theme-btn" class="hidden md:inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 transition" title="Toggle Theme">
           <svg class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
           <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
-        </button>
-
-        <button onclick="toggleLanguage()" id="header-lang-btn" class="hidden md:inline-flex border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2.5 py-1.5 text-xs font-medium transition">
-          RU
         </button>
 
         <span id="current-user-badge" class="text-stone-400 hidden xl:inline"></span>
@@ -244,11 +242,6 @@
                   <svg class="w-3.5 h-3.5 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
                   <svg class="w-3.5 h-3.5 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
                 </span>
-              </button>
-
-              <button type="button" onclick="toggleLanguage()" class="w-full text-left px-3 py-2 flex items-center justify-between text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626] transition">
-                <span data-i18n="nav_language">Язык</span>
-                <span id="mobile-menu-lang-label" class="font-medium uppercase text-[11px] text-stone-500 dark:text-stone-400">RU</span>
               </button>
 
               <button type="button" id="mobile-menu-settings-btn" onclick="closeMobileMenu(); openSettingsModal();" class="hidden w-full text-left px-3 py-2 flex items-center gap-2 text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-[#262626] transition">
@@ -299,7 +292,13 @@
         <div class="mb-10">
           <h2 class="serif-title text-3xl md:text-5xl tracking-widest mb-2" data-i18n="home_title">Хроника архива</h2>
           <p class="text-xs tracking-[0.2em] uppercase text-stone-400" data-i18n="home_subtitle">Все альбомы и подпапки вашего архива</p>
-          <p id="home-totals-summary" class="text-xs tracking-[0.15em] text-stone-500 dark:text-stone-400 mt-2"></p>
+          <div class="flex flex-wrap items-center justify-between gap-3 mt-2">
+            <p id="home-totals-summary" class="text-xs tracking-[0.15em] text-stone-500 dark:text-stone-400"></p>
+            <a id="home-fav-zip-btn" href="#" class="hidden inline-flex items-center gap-1.5 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-3.5 py-1.5 text-xs tracking-[0.12em] uppercase transition shadow-sm">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              <span id="home-fav-zip-label" data-i18n="download_fav_zip">Скачать избранное (ZIP)</span>
+            </a>
+          </div>
         </div>
         <div id="years-container" class="space-y-16"></div>
       </div>
@@ -473,7 +472,7 @@
       <div class="space-y-4">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_appearance">Оформление и сетка</h3>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+          <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
             <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="settings_gallery_name">Заголовок галереи (название)</label>
             <div class="flex gap-2">
               <input id="pref-gallery-title" type="text" class="flex-grow border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs" />
@@ -511,10 +510,31 @@
               <option value="crop" data-i18n="ratio_crop">Ровная плитка (4:3)</option>
             </select>
           </div>
+          <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+            <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="nav_language">Язык</label>
+            <select id="pref-lang" onchange="changeLanguage(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+              <option value="ru">Русский</option>
+              <option value="en">English</option>
+            </select>
+          </div>
         </div>
       </div>
 
       <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+        <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_favorites">Избранное</h3>
+        <div class="flex flex-wrap items-center justify-between gap-3 p-4 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800">
+          <div>
+            <div class="text-sm font-medium" data-i18n="clear_fav_title">Очистить список избранного</div>
+            <div class="text-xs text-stone-500" data-i18n="clear_fav_desc">Снять отметку «Избранное» со всех ваших фото и видео</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="fav-cleared-msg" class="text-xs text-green-600 hidden" data-i18n="msg_fav_cleared">✓ Избранное очищено</span>
+            <button type="button" onclick="clearAllFavorites()" class="border border-red-500 text-red-500 hover:bg-red-500 hover:text-white px-4 py-2 text-xs tracking-[0.15em] uppercase transition" data-i18n="btn_clear_fav">Очистить избранное</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_view_params">Параметры просмотра и загрузки</h3>
         <label class="flex items-center justify-between p-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 cursor-pointer">
           <div>
@@ -539,7 +559,7 @@
         </label>
       </div>
 
-      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_filters">Фильтрация папок и файлов</h3>
         <div class="space-y-3 bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
           
@@ -565,7 +585,7 @@
         </div>
       </div>
 
-      <div class="space-y-3 border-t border-stone-200 dark:border-stone-800 pt-6">
+      <div class="admin-only-setting space-y-3 border-t border-stone-200 dark:border-stone-800 pt-6">
         <div class="flex items-center justify-between mb-2">
           <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_cache">Кэш и миниатюры</h3>
           <span id="cache-size-badge" class="text-xs font-semibold text-stone-600 dark:text-stone-400">...</span>
@@ -590,7 +610,7 @@
         </div>
       </div>
 
-      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_libraries">Библиотеки фотографий (папки)</h3>
         <div id="libraries-list" class="space-y-2 text-xs"></div>
 
@@ -608,7 +628,7 @@
         </form>
       </div>
 
-      <div class="space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
+      <div class="admin-only-setting space-y-4 border-t border-stone-200 dark:border-stone-800 pt-6">
         <h3 class="text-xs tracking-[0.2em] uppercase font-semibold text-stone-500" data-i18n="settings_users">Пользователи и доступ к альбомам</h3>
         <div id="users-list" class="space-y-2 text-xs"></div>
 
@@ -715,6 +735,14 @@
         sort_date_desc: 'Дата (сначала новые)',
         copy_fav_names: 'Скопировать имена',
         download_fav_zip: 'Скачать избранное (ZIP)',
+        download_fav_photos_zip: 'Скачать избранные фото (ZIP)',
+        download_fav_videos_zip: 'Скачать избранное видео (ZIP)',
+        settings_favorites: 'Избранное',
+        clear_fav_title: 'Очистить список избранного',
+        clear_fav_desc: 'Снять отметку «Избранное» со всех ваших фото и видео',
+        btn_clear_fav: 'Очистить избранное',
+        confirm_clear_fav: 'Снять отметку «Избранное» со всех фотографий и видео?',
+        msg_fav_cleared: '✓ Избранное очищено',
         no_photos: 'Нет фотографий для отображения',
         fav_empty_title: 'В избранном пока пусто',
         fav_empty_desc: 'Нажимайте на иконку сердечка на фотографиях, чтобы собрать здесь лучшие кадры.',
@@ -855,6 +883,14 @@
         sort_date_desc: 'Date (Newest first)',
         copy_fav_names: 'Copy Filenames',
         download_fav_zip: 'Download Favorites (ZIP)',
+        download_fav_photos_zip: 'Download Favorite Photos (ZIP)',
+        download_fav_videos_zip: 'Download Favorite Videos (ZIP)',
+        settings_favorites: 'Favorites',
+        clear_fav_title: 'Clear Favorites',
+        clear_fav_desc: 'Remove the Favorite mark from all your photos and videos',
+        btn_clear_fav: 'Clear Favorites',
+        confirm_clear_fav: 'Remove Favorite status from all photos and videos?',
+        msg_fav_cleared: '✓ Favorites cleared',
         no_photos: 'No photos to display',
         fav_empty_title: 'Favorites are empty',
         fav_empty_desc: 'Click the heart icon on photos to collect your best shots here.',
@@ -993,10 +1029,10 @@
 
     function applyTranslations() {
       document.documentElement.lang = currentLang;
-      document.getElementById('header-lang-btn').textContent = currentLang.toUpperCase();
-      document.getElementById('login-lang-btn').textContent = currentLang.toUpperCase();
-      const mobileLangLabel = document.getElementById('mobile-menu-lang-label');
-      if (mobileLangLabel) mobileLangLabel.textContent = currentLang.toUpperCase();
+      const loginLangBtn = document.getElementById('login-lang-btn');
+      if (loginLangBtn) loginLangBtn.textContent = currentLang.toUpperCase();
+      const prefLang = document.getElementById('pref-lang');
+      if (prefLang) prefLang.value = currentLang;
 
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -1022,10 +1058,14 @@
       }
     }
 
-    function toggleLanguage() {
-      currentLang = currentLang === 'ru' ? 'en' : 'ru';
+    function changeLanguage(lang) {
+      currentLang = lang === 'en' ? 'en' : 'ru';
       localStorage.setItem('pixie_lang', currentLang);
       applyTranslations();
+    }
+
+    function toggleLanguage() {
+      changeLanguage(currentLang === 'ru' ? 'en' : 'ru');
     }
 
     function applyPreferences() {
@@ -1207,11 +1247,9 @@
       document.getElementById('header-brand-title').textContent = titleText;
       document.getElementById('login-modal-title').textContent = titleText;
 
-      if (currentUser.role === 'admin') {
-        document.getElementById('settings-btn').classList.remove('hidden');
-        const mobileSettingsBtn = document.getElementById('mobile-menu-settings-btn');
-        if (mobileSettingsBtn) mobileSettingsBtn.classList.remove('hidden');
-      }
+      document.getElementById('settings-btn').classList.remove('hidden');
+      const mobileSettingsBtn = document.getElementById('mobile-menu-settings-btn');
+      if (mobileSettingsBtn) mobileSettingsBtn.classList.remove('hidden');
       if (currentUser && currentUser.default_library) {
         const storedLib = localStorage.getItem('pixie_library');
         if (!storedLib) {
@@ -1489,6 +1527,24 @@
       if (sidebarSummary) sidebarSummary.textContent = text;
       const homeSummary = document.getElementById('home-totals-summary');
       if (homeSummary) homeSummary.textContent = text;
+
+      const homeFavZipBtn = document.getElementById('home-fav-zip-btn');
+      if (homeFavZipBtn) {
+        const canZip = appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin');
+        const hasItems = (totalPhotos + totalVideos) > 0;
+        if (showOnlyFavorites && canZip && hasItems) {
+          homeFavZipBtn.href = `/api/download-favorites-zip?lib=${encodeURIComponent(currentLibraryId)}&media_type=${encodeURIComponent(currentMediaTypeFilter)}`;
+          const lbl = document.getElementById('home-fav-zip-label');
+          if (lbl) {
+            if (currentMediaTypeFilter === 'photo') lbl.textContent = t('download_fav_photos_zip');
+            else if (currentMediaTypeFilter === 'video') lbl.textContent = t('download_fav_videos_zip');
+            else lbl.textContent = t('download_fav_zip');
+          }
+          homeFavZipBtn.classList.remove('hidden');
+        } else {
+          homeFavZipBtn.classList.add('hidden');
+        }
+      }
     }
 
     function renderSidebarTree(activePath = '') {
@@ -1735,6 +1791,8 @@
       const homeView = document.getElementById('home-view');
       const albumView = document.getElementById('album-view');
       const mainContainer = document.getElementById('main-scroll-area');
+      const ratioWrap = document.getElementById('ratio-toggle-wrap');
+      if (ratioWrap) ratioWrap.classList.toggle('hidden', isHome);
 
       if (isHome) {
         const yearToScroll = currentAlbumYear;
@@ -2426,22 +2484,67 @@
     }
 
     async function openSettingsModal() {
-      document.getElementById('pref-gallery-title').value = appSettings.gallery_title ?? '';
-      document.getElementById('opt-show-exif').checked = !!appSettings.show_exif;
-      document.getElementById('opt-allow-zip').checked = !!appSettings.allow_zip_download;
-      document.getElementById('opt-show-hidden').checked = !!appSettings.show_hidden_albums;
-      document.getElementById('opt-exclude-exts').value = appSettings.exclude_extensions || '';
-      document.getElementById('opt-exclude-masks').value = appSettings.exclude_masks || '';
-      document.getElementById('filter-saved-msg').classList.add('hidden');
-      document.getElementById('title-saved-msg').classList.add('hidden');
-      
-      await loadLibrariesAdmin();
-      resetLibraryForm();
-      resetUserForm();
-      renderHiddenAlbumsCheckboxes();
-      await loadUsersList();
-      await pollPregenStatus();
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      document.querySelectorAll('.admin-only-setting').forEach(el => {
+        el.classList.toggle('hidden', !isAdmin);
+      });
+      const prefLang = document.getElementById('pref-lang');
+      if (prefLang) prefLang.value = currentLang;
+      const favClearedMsg = document.getElementById('fav-cleared-msg');
+      if (favClearedMsg) favClearedMsg.classList.add('hidden');
+
+      if (isAdmin) {
+        document.getElementById('pref-gallery-title').value = appSettings.gallery_title ?? '';
+        document.getElementById('opt-show-exif').checked = !!appSettings.show_exif;
+        document.getElementById('opt-allow-zip').checked = !!appSettings.allow_zip_download;
+        document.getElementById('opt-show-hidden').checked = !!appSettings.show_hidden_albums;
+        document.getElementById('opt-exclude-exts').value = appSettings.exclude_extensions || '';
+        document.getElementById('opt-exclude-masks').value = appSettings.exclude_masks || '';
+        document.getElementById('filter-saved-msg').classList.add('hidden');
+        document.getElementById('title-saved-msg').classList.add('hidden');
+
+        await loadLibrariesAdmin();
+        resetLibraryForm();
+        resetUserForm();
+        renderHiddenAlbumsCheckboxes();
+        await loadUsersList();
+        await pollPregenStatus();
+      }
       document.getElementById('settings-modal').classList.remove('hidden');
+    }
+
+    async function clearAllFavorites() {
+      if (!confirm(t('confirm_clear_fav'))) return;
+      const res = await fetch('/api/favorites/clear', { method: 'POST' });
+      if (!res.ok) return;
+
+      for (const y of allYears) {
+        for (const a of y.albums) {
+          a.fav_photo_count = 0;
+          a.fav_video_count = 0;
+        }
+      }
+      if (currentPhotos.length) {
+        currentPhotos.forEach(p => { p.is_favorite = false; });
+      }
+      if (currentAlbumData && Array.isArray(currentAlbumData.photos)) {
+        currentAlbumData.photos.forEach(p => { p.is_favorite = false; });
+      }
+
+      renderSidebarTree(currentAlbumPath);
+      if (currentAlbumPath) {
+        renderAlbumPhotos();
+        updateAlbumHeaderCount();
+        renderSiblingNav();
+      } else {
+        renderYears('ALL');
+      }
+
+      const msg = document.getElementById('fav-cleared-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 2500);
+      }
     }
 
     async function loadLibrariesAdmin() {

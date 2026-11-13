@@ -1156,6 +1156,15 @@ def toggle_favorite(req: FavoriteToggleRequest, user: dict = Depends(get_current
     return {"status": "ok", "photo_path": rel_clean, "lib": lib_id, "is_favorite": is_favorite}
 
 
+@app.post("/api/favorites/clear")
+def clear_favorites(user: dict = Depends(get_current_user)):
+    db = load_db()
+    uname = user["username"]
+    db.setdefault("favorites", {})[uname] = []
+    save_db(db)
+    return {"status": "ok"}
+
+
 def run_all_thumbnails_task():
     global pregen_status
     db = load_db()
@@ -1613,6 +1622,70 @@ def download_album_zip(
     zip_buffer.seek(0)
     suffix = "_favorites" if favorites_only else ""
     safe_filename = quote(f"{target_dir.name}{suffix}.zip")
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_filename}"}
+    )
+
+
+@app.get("/api/download-favorites-zip")
+def download_favorites_zip(
+    lib: Optional[str] = "default",
+    media_type: str = "all",
+    user: dict = Depends(get_current_user)
+):
+    db = load_db()
+    if not db.get("settings", {}).get("allow_zip_download", True) and user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="ZIP download disabled")
+    lib_id, _, _ = get_library_root(lib, db)
+    ex_exts, ex_masks, _ = get_filter_rules(db)
+    user_favs = db.get("favorites", {}).get(user["username"], [])
+
+    prefix = f"{lib_id}::"
+    items = []
+    for fk in sorted(user_favs):
+        if lib_id == "default":
+            if "::" in fk:
+                continue
+            rel_path = fk
+        else:
+            if not fk.startswith(prefix):
+                continue
+            rel_path = fk[len(prefix):]
+
+        if not user_can_access_image(user, rel_path, lib_id):
+            continue
+        try:
+            orig_path = safe_resolve(rel_path, lib_id, db)
+        except HTTPException:
+            continue
+        if not is_valid_media(orig_path, ex_exts, ex_masks):
+            continue
+
+        ext = orig_path.suffix.lower()
+        if media_type == "photo" and ext not in SUPPORTED_IMAGE_EXTS:
+            continue
+        if media_type == "video" and ext not in SUPPORTED_VIDEO_EXTS:
+            continue
+
+        items.append((orig_path, rel_path))
+
+    if not items:
+        raise HTTPException(status_code=404, detail="No favorite media files to download")
+
+    zip_buffer = BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_STORED) as zf:
+        for orig_path, rel_path in items:
+            zf.write(orig_path, arcname=rel_path)
+    zip_buffer.seek(0)
+
+    suffix = ""
+    if media_type == "photo":
+        suffix = "_photos"
+    elif media_type == "video":
+        suffix = "_videos"
+    safe_filename = quote(f"favorites{suffix}.zip")
     return StreamingResponse(
         zip_buffer,
         media_type="application/zip",
