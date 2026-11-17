@@ -1937,37 +1937,44 @@ def get_structure(lib: Optional[str] = None, user: dict = Depends(get_current_us
             except Exception:
                 continue
 
-    admin_catalog = []
-    if user["role"] == "admin":
-        all_libs = get_libraries_list(db)
-        for lobj in all_libs:
-            lid = lobj.get("id", "default")
-            try:
-                _, lroot, _ = get_library_root(lid, db)
-            except Exception:
-                continue
-            lyears = scan_all_albums_recursive(
-                ex_exts, ex_masks, hidden_folders, show_hidden,
-                lib_id=lid, lib_root=lroot
-            )
-            for y in lyears:
-                for alb in y["albums"]:
-                    perm_key = alb["path"] if lid == "default" else f"{lid}::{alb['path']}"
-                    admin_catalog.append({
-                        "path": perm_key,
-                        "label": alb["path"],
-                        "name": alb["name"],
-                        "lib_id": lid,
-                        "rel_path": alb["path"]
-                    })
-
     return {
         "libraries": accessible_libs,
         "active_library": active_lib,
         "years": filtered_years,
         "sibling_catalog": active_albums_flat,
-        "all_albums_catalog": admin_catalog if user["role"] == "admin" else active_albums_flat
+        "all_albums_catalog": active_albums_flat
     }
+
+
+@app.get("/api/admin/catalog")
+def get_admin_catalog(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = load_db()
+    ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
+    show_hidden = db.get("settings", {}).get("show_hidden_albums", False)
+    admin_catalog = []
+    for lobj in get_libraries_list(db):
+        lid = lobj.get("id", "default")
+        try:
+            _, lroot, _ = get_library_root(lid, db)
+        except Exception:
+            continue
+        lyears = scan_all_albums_recursive(
+            ex_exts, ex_masks, hidden_folders, show_hidden,
+            lib_id=lid, lib_root=lroot
+        )
+        for y in lyears:
+            for alb in y["albums"]:
+                perm_key = alb["path"] if lid == "default" else f"{lid}::{alb['path']}"
+                admin_catalog.append({
+                    "path": perm_key,
+                    "label": alb["path"],
+                    "name": alb["name"],
+                    "lib_id": lid,
+                    "rel_path": alb["path"]
+                })
+    return {"all_albums_catalog": admin_catalog}
 
 
 @app.get("/api/album/{album_path:path}")

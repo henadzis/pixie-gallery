@@ -35,6 +35,10 @@
       gap: var(--grid-gap, 1.25rem);
       align-items: start;
     }
+    .home-year-group, .home-album-card, .photo-grid > div {
+      content-visibility: auto;
+      contain-intrinsic-size: auto 260px;
+    }
     @media (max-width: 1024px) {
       .photo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
     }
@@ -282,8 +286,6 @@
           </button>
         </div>
 
-        <button onclick="handleLogout()" class="hidden md:inline-flex text-stone-500 dark:text-stone-400 hover:text-stone-800 dark:hover:text-stone-200 transition" data-i18n="nav_logout">Выйти</button>
-
         <!-- Мобильное меню (бутерброд) -->
         <div id="mobile-menu-wrap" class="relative md:hidden shrink-0">
           <button type="button" id="mobile-menu-btn" onclick="toggleMobileMenu(event)" aria-expanded="false" aria-haspopup="true" class="inline-flex items-center justify-center border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 p-1.5 text-stone-800 dark:text-stone-200 transition" title="Меню" data-i18n-title="nav_menu">
@@ -322,10 +324,6 @@
                 </svg>
                 <span data-i18n="nav_settings">Настройки</span>
               </button>
-            </div>
-
-            <div class="border-t border-stone-200 dark:border-stone-800 pt-1">
-              <button type="button" onclick="closeMobileMenu(); handleLogout();" class="w-full text-left px-3 py-2 text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-[#262626] hover:text-stone-900 dark:hover:text-stone-100 transition" data-i18n="nav_logout">Выйти</button>
             </div>
           </div>
         </div>
@@ -571,6 +569,10 @@
           <button type="button" data-settings-tab="exports" onclick="switchSettingsTab('exports')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span data-i18n="tab_exports">Экспорт</span>
+          </button>
+          <button type="button" onclick="closeSettingsModal(); handleLogout();" class="md:mt-auto whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-white dark:bg-[#1e1e1e] hover:bg-red-50 dark:hover:bg-red-950/30 transition text-left">
+            <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            <span data-i18n="nav_logout">Выйти</span>
           </button>
         </nav>
 
@@ -1532,6 +1534,8 @@
 
     let isZoomed = false;
     let zoomScale = 1;
+    let zoomBaseW = 0;
+    let zoomBaseH = 0;
     let panX = 0;
     let panY = 0;
     let isDragging = false;
@@ -2154,7 +2158,7 @@
               return `
               <div onclick="openAlbum('${encodeURIComponent(album.path)}')" class="home-album-card group cursor-pointer" data-search="${album.path}" title="${album.path}">
                 <div class="relative aspect-[4/3] w-full overflow-hidden bg-stone-200 dark:bg-stone-800 mb-2">
-                  <img src="${album.cover}" loading="lazy" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+                  <img src="${album.cover}" loading="lazy" decoding="async" alt="${album.name}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
                   <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
                   ${counts.videos ? `
                     <div class="absolute top-2 left-2 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium tracking-wider pointer-events-none">
@@ -2173,13 +2177,15 @@
     }
 
     function setHashSilently(newHash) {
-      suppressHashEvent = true;
-      window.location.hash = newHash;
-      setTimeout(() => { suppressHashEvent = false; }, 50);
+      const targetUrl = newHash
+        ? `${window.location.pathname}${window.location.search}${newHash}`
+        : `${window.location.pathname}${window.location.search}`;
+      if (window.location.hash !== newHash) {
+        history.pushState(null, '', targetUrl);
+      }
     }
 
     async function handleHashNavigation() {
-      if (suppressHashEvent) return;
       const hash = window.location.hash || '';
       if (hash.startsWith('#album/')) {
         const encPath = hash.slice('#album/'.length);
@@ -2192,7 +2198,7 @@
       }
     }
 
-    window.addEventListener('hashchange', handleHashNavigation);
+    window.addEventListener('popstate', handleHashNavigation);
 
     async function hideCurrentAlbum() {
       let hiddenList = appSettings.hidden_folders ? appSettings.hidden_folders.split('|').map(s=>s.trim()).filter(Boolean) : [];
@@ -2526,7 +2532,7 @@
 
       grid.innerHTML = displayedPhotos.map((p, idx) => `
         <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
-          <img src="${p.thumb}" loading="lazy" alt="${p.name}" data-idx="${idx}" data-src="${p.thumb}"
+          <img src="${p.thumb}" loading="lazy" decoding="async" alt="${p.name}" data-idx="${idx}" data-src="${p.thumb}"
                onload="onThumbLoaded(this, ${isCrop})"
                onerror="onThumbError(this)"
                onclick="openLightbox(${idx})" class="${isCrop ? 'w-full h-full object-cover' : ''} block cursor-pointer group-hover:scale-105 transition-transform duration-700 ease-out" />
@@ -2610,10 +2616,22 @@
     function applyZoomTransform() {
       const img = document.getElementById('lb-image');
       if (!isZoomed) {
-        img.style.transform = 'translate3d(0px, 0px, 0) scale(1)';
+        img.classList.add('max-h-[78vh]', 'max-w-[88vw]');
+        img.classList.remove('max-w-none', 'max-h-none', 'shrink-0');
+        img.style.width = '';
+        img.style.height = '';
+        img.style.transform = 'translate3d(0px, 0px, 0)';
         img.style.cursor = 'zoom-in';
       } else {
-        img.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${zoomScale})`;
+        if (zoomBaseW > 0 && zoomBaseH > 0) {
+          img.classList.remove('max-h-[78vh]', 'max-w-[88vw]');
+          img.classList.add('max-w-none', 'max-h-none', 'shrink-0');
+          img.style.width = `${Math.round(zoomBaseW * zoomScale)}px`;
+          img.style.height = `${Math.round(zoomBaseH * zoomScale)}px`;
+          img.style.transform = `translate3d(${panX}px, ${panY}px, 0)`;
+        } else {
+          img.style.transform = `translate3d(${panX}px, ${panY}px, 0) scale(${zoomScale})`;
+        }
         img.style.cursor = isDragging ? 'grabbing' : 'grab';
       }
     }
@@ -2621,6 +2639,8 @@
     function resetZoomState() {
       isZoomed = false;
       zoomScale = 1;
+      zoomBaseW = 0;
+      zoomBaseH = 0;
       panX = 0;
       panY = 0;
       isDragging = false;
@@ -2670,6 +2690,8 @@
       const badge = document.getElementById('lb-res-badge');
 
       if (!isZoomed) {
+        zoomBaseW = img.clientWidth || 0;
+        zoomBaseH = img.clientHeight || 0;
         isZoomed = true;
         zoomScale = 2.2;
         panX = 0;
@@ -2677,7 +2699,15 @@
         label.textContent = t('zoom_reset');
         badge.textContent = t('badge_loading_orig');
         img.onload = () => {
-          if (isZoomed) badge.textContent = t('badge_orig');
+          if (!isZoomed) return;
+          badge.textContent = t('badge_orig');
+          if (typeof img.decode === 'function') {
+            img.decode().catch(() => {}).finally(() => {
+              if (isZoomed) applyZoomTransform();
+            });
+          } else {
+            applyZoomTransform();
+          }
         };
         img.src = item.original;
         applyZoomTransform();
@@ -3085,6 +3115,13 @@
         if (optResMsg) optResMsg.classList.add('hidden');
 
         await loadLibrariesAdmin();
+        try {
+          const catRes = await fetch('/api/admin/catalog');
+          if (catRes.ok) {
+            const catData = await catRes.json();
+            allAlbumsCatalog = catData.all_albums_catalog || [];
+          }
+        } catch (e) {}
         resetLibraryForm();
         resetUserForm();
         renderHiddenAlbumsCheckboxes();
