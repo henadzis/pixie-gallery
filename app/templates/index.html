@@ -533,10 +533,7 @@
     <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-4xl w-full h-[100dvh] sm:h-[85vh] sm:max-h-[85vh] flex flex-col shadow-xl overflow-hidden">
       <!-- Шапка модального окна -->
       <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 px-5 py-4 shrink-0">
-        <div class="flex items-baseline gap-3">
-          <h2 class="serif-title text-xl sm:text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки</h2>
-          <span class="text-[11px] font-mono text-stone-400 dark:text-stone-500">{{ app_version }}</span>
-        </div>
+        <h2 class="serif-title text-xl sm:text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки</h2>
         <button onclick="closeSettingsModal()" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -573,7 +570,11 @@
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span data-i18n="tab_exports">Экспорт</span>
           </button>
-          <button type="button" onclick="closeSettingsModal(); handleLogout();" class="md:mt-auto whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-white dark:bg-[#1e1e1e] hover:bg-red-50 dark:hover:bg-red-950/30 transition text-left">
+          <div class="md:mt-auto px-2 py-1 text-[11px] text-stone-400 dark:text-stone-500 whitespace-nowrap flex items-center gap-1">
+            <span data-i18n="app_version_label">Версия программы:</span>
+            <span class="font-mono text-stone-500 dark:text-stone-400">{{ app_version }}</span>
+          </div>
+          <button type="button" onclick="closeSettingsModal(); handleLogout();" class="whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 bg-white dark:bg-[#1e1e1e] hover:bg-red-50 dark:hover:bg-red-950/30 transition text-left">
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
             <span data-i18n="nav_logout">Выйти</span>
           </button>
@@ -1120,6 +1121,7 @@
         nav_language: 'Язык',
         nav_settings: 'Настройки',
         nav_logout: 'Выйти',
+        app_version_label: 'Версия программы:',
         search_placeholder: 'Поиск альбома...',
         cols_label: 'Столбцы:',
         cols_3: '3 в ряд',
@@ -1338,6 +1340,7 @@
         nav_language: 'Language',
         nav_settings: 'Settings',
         nav_logout: 'Logout',
+        app_version_label: 'App version:',
         search_placeholder: 'Search album...',
         cols_label: 'Columns:',
         cols_3: '3 per row',

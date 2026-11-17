@@ -12,5 +12,7 @@ COPY . /code
 
 ENV PYTHONPATH=/code
 ENV TMPDIR=/tmp
+ARG APP_VERSION=v0.9.1
+ENV APP_VERSION=$APP_VERSION
 
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

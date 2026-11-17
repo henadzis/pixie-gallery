@@ -23,8 +23,26 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from PIL import Image, ImageOps, ExifTags
 
+def _detect_app_version() -> str:
+    env_ver = (os.getenv("APP_VERSION") or "").strip()
+    if env_ver:
+        return env_ver
+    try:
+        proc = subprocess.run(
+            ["git", "describe", "--tags", "--abbrev=0"],
+            capture_output=True,
+            text=True,
+            timeout=2
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout.strip()
+    except Exception:
+        pass
+    return "v0.9.1"
+
+
 app = FastAPI()
-APP_VERSION = os.getenv("APP_VERSION", "v0.9")
+APP_VERSION = _detect_app_version()
 
 PHOTOS_DIR = Path(os.getenv("PHOTOS_DIR", "/photos")).resolve()
 CACHE_DIR = Path(os.getenv("CACHE_DIR", "/cache")).resolve()
