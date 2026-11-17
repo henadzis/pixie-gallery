@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from PIL import Image, ImageOps, ExifTags
 
 app = FastAPI()
+APP_VERSION = os.getenv("APP_VERSION", "v0.9")
 
 PHOTOS_DIR = Path(os.getenv("PHOTOS_DIR", "/photos")).resolve()
 CACHE_DIR = Path(os.getenv("CACHE_DIR", "/cache")).resolve()
@@ -928,7 +929,7 @@ async def web_manifest():
 async def index(request: Request):
     db = load_db()
     title = db.get("settings", {}).get("gallery_title", "")
-    return templates.TemplateResponse("index.html", {"request": request, "title": title})
+    return templates.TemplateResponse("index.html", {"request": request, "title": title, "app_version": APP_VERSION})
 
 
 @app.post("/api/login")
@@ -2298,18 +2299,7 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
     target_stream_file = orig_path
     media_type = "video/mp4"
 
-    stat = orig_path.stat()
-    cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
-    hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
-    transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
-    if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
-        try:
-            os.utime(transcoded_file, None)
-        except Exception:
-            pass
-        target_stream_file = transcoded_file
-        media_type = "video/mp4"
-    elif ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
         if ext == ".webm":
             media_type = "video/webm"
         elif ext == ".mov":
@@ -2317,7 +2307,19 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
         else:
             media_type = "video/mp4"
     else:
-        raise HTTPException(status_code=422, detail="Video needs transcoding")
+        stat = orig_path.stat()
+        cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+        hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+        transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+        if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+            try:
+                os.utime(transcoded_file, None)
+            except Exception:
+                pass
+            target_stream_file = transcoded_file
+            media_type = "video/mp4"
+        else:
+            raise HTTPException(status_code=422, detail="Video needs transcoding")
 
     return range_file_response(request, target_stream_file, media_type)
 
@@ -2385,11 +2387,10 @@ def trigger_video_transcode(video_path: str, background_tasks: BackgroundTasks, 
 
 
 def _collect_videos_needing_cache(db: dict) -> list[tuple[Path, Path, str]]:
-    """Collect (orig_path, output_file, hash_str) for unsupported or >1080p videos not yet cached."""
+    """Collect (orig_path, output_file, hash_str) for unsupported videos not yet cached."""
     ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
     libs = get_libraries_list(db)
     tasks_list = []
-    meta_dirty = False
 
     for lib in libs:
         lid = lib.get("id", "default")
@@ -2415,21 +2416,7 @@ def _collect_videos_needing_cache(db: dict) -> list[tuple[Path, Path, str]]:
                 p = Path(root) / f
                 if not is_valid_media(p, ex_exts, ex_masks):
                     continue
-                ext = p.suffix.lower()
-                if ext not in SUPPORTED_VIDEO_EXTS:
-                    continue
-
-                needs_transcode = ext not in SUPPORTED_NATIVE_VIDEO_EXTS
-                if not needs_transcode:
-                    meta, updated = extract_video_metadata(p)
-                    if updated:
-                        meta_dirty = True
-                    w = int(meta.get("width", 0) or 0)
-                    h = int(meta.get("height", 0) or 0)
-                    if w > 1920 or h > 1080:
-                        needs_transcode = True
-
-                if not needs_transcode:
+                if p.suffix.lower() not in SUPPORTED_TRANSCODE_VIDEO_EXTS:
                     continue
 
                 stat = p.stat()
@@ -2440,8 +2427,6 @@ def _collect_videos_needing_cache(db: dict) -> list[tuple[Path, Path, str]]:
                     continue
                 tasks_list.append((p, out_file, hash_str))
 
-    if meta_dirty:
-        save_video_meta_cache()
     return tasks_list
 
 

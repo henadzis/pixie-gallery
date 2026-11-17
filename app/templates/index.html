@@ -533,7 +533,10 @@
     <div class="bg-white dark:bg-[#181818] border border-stone-200 dark:border-stone-800 max-w-4xl w-full h-[100dvh] sm:h-[85vh] sm:max-h-[85vh] flex flex-col shadow-xl overflow-hidden">
       <!-- Шапка модального окна -->
       <div class="flex items-center justify-between border-b border-stone-200 dark:border-stone-800 px-5 py-4 shrink-0">
-        <h2 class="serif-title text-xl sm:text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки</h2>
+        <div class="flex items-baseline gap-3">
+          <h2 class="serif-title text-xl sm:text-2xl tracking-[0.15em] uppercase" data-i18n="settings_title">Настройки</h2>
+          <span class="text-[11px] font-mono text-stone-400 dark:text-stone-500">{{ app_version }}</span>
+        </div>
         <button onclick="closeSettingsModal()" class="text-stone-400 hover:text-black dark:hover:text-white p-1">
           <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -904,7 +907,7 @@
                   </button>
                   <span class="pixie-tip">
                     <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
-                    <span class="pixie-tip-box" data-i18n="tip_video_pregen">Заранее перекодирует в кэш неподдерживаемые ролики (MKV/AVI/MTS и др.), а также видео выше 1080p (например, 4K), ограничивая их до 1080p для плавного воспроизведения.</span>
+                    <span class="pixie-tip-box" data-i18n="tip_video_pregen">Заранее перекодирует в кэш только неподдерживаемые ролики (MKV/AVI/MTS и др.), уменьшая файлы выше 1080p до 1080p. Нативные MP4/MOV/WEBM не затрагиваются.</span>
                   </span>
                 </div>
                 <button type="button" onclick="cancelVideoPregenerate()" id="video-pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
@@ -1255,7 +1258,7 @@
         lite_mode_label: 'Lite-режим (слабый NAS / ARM)',
         tip_lite_mode: 'Снижает нагрузку на CPU и ОЗУ (подходит для ARM / 512 МБ–1 ГБ RAM): отключает перекодирование видео через FFmpeg и ограничивает генерацию миниатюр до 1 потока.',
         btn_video_pregen: 'Создать кэш видео (1080p)',
-        tip_video_pregen: 'Заранее перекодирует в кэш неподдерживаемые ролики (MKV/AVI/MTS и др.), а также видео выше 1080p (например, 4K), ограничивая их до 1080p для плавного воспроизведения.',
+        tip_video_pregen: 'Заранее перекодирует в кэш только неподдерживаемые ролики (MKV/AVI/MTS и др.), уменьшая файлы выше 1080p до 1080p. Нативные MP4/MOV/WEBM не затрагиваются.',
         video_transcode_disabled_lite: 'Перекодирование отключено в Lite-режиме',
         btn_optimize_cache: 'Оптимизировать кэш',
         optimizing_cache: 'Оптимизация...',
@@ -1473,7 +1476,7 @@
         lite_mode_label: 'Lite Mode (low-power NAS / ARM)',
         tip_lite_mode: 'Reduces CPU and RAM usage (for ARM / 512 MB–1 GB RAM): disables FFmpeg video transcoding and limits thumbnail generation to 1 worker thread.',
         btn_video_pregen: 'Build Video Cache (1080p)',
-        tip_video_pregen: 'Pre-transcodes unsupported videos (MKV/AVI/MTS, etc.) and videos above 1080p (such as 4K) into 1080p cache for smooth playback.',
+        tip_video_pregen: 'Pre-transcodes only unsupported videos (MKV/AVI/MTS, etc.) into cache, downscaling files above 1080p to 1080p. Native MP4/MOV/WEBM files are left untouched.',
         video_transcode_disabled_lite: 'Transcoding is disabled in Lite mode',
         btn_optimize_cache: 'Optimize Cache',
         optimizing_cache: 'Optimizing...',
