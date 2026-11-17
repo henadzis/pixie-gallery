@@ -274,8 +274,6 @@
           <svg class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
         </button>
 
-        <span id="current-user-badge" class="text-stone-400 hidden xl:inline"></span>
-
         <div class="hidden md:inline-flex">
           <button id="settings-btn" onclick="openSettingsModal()" class="hidden inline-flex items-center gap-1.5 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-3 py-1.5 transition">
             <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -285,6 +283,8 @@
             <span class="hidden md:inline" data-i18n="nav_settings">Настройки</span>
           </button>
         </div>
+
+        <span id="current-user-badge" class="text-stone-400 hidden xl:inline"></span>
 
         <!-- Мобильное меню (бутерброд) -->
         <div id="mobile-menu-wrap" class="relative md:hidden shrink-0">
@@ -791,6 +791,19 @@
                 </div>
               </div>
 
+              <!-- Lite-режим (слабый NAS / ARM) -->
+              <div class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 flex flex-wrap items-center justify-between gap-3">
+                <label class="cursor-pointer flex items-center gap-2.5 text-xs font-medium uppercase tracking-wider">
+                  <input id="opt-lite-mode" type="checkbox" onchange="saveLiteModeSetting()" class="accent-stone-900 dark:accent-stone-100 w-4 h-4" />
+                  <span data-i18n="lite_mode_label">Lite-режим (слабый NAS / ARM)</span>
+                  <span class="pixie-tip" onclick="event.preventDefault();">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_lite_mode">Снижает нагрузку на CPU и ОЗУ (подходит для ARM / 512 МБ–1 ГБ RAM): отключает перекодирование видео через FFmpeg и ограничивает генерацию миниатюр до 1 потока.</span>
+                  </span>
+                </label>
+                <span id="lite-mode-saved-msg" class="text-xs text-green-600 hidden" data-i18n="msg_saved">✓ Сохранено</span>
+              </div>
+
             </div>
 
             <!-- Единая область очистки (Избранное + Оптимизация кэша + Очистка кэша) -->
@@ -878,6 +891,30 @@
                 <div id="pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
                   <div id="pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
                 </div>
+              </div>
+            </div>
+
+            <!-- Пакетный кэш видео (1080p) -->
+            <div id="video-pregen-card" class="admin-only-setting bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-3">
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="inline-flex items-center gap-1.5">
+                  <button type="button" onclick="triggerVideoPregenerate()" id="video-pregen-action-btn" class="inline-flex items-center gap-2 bg-stone-900 hover:bg-black dark:bg-stone-100 dark:hover:bg-white dark:text-stone-900 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <span data-i18n="btn_video_pregen">Создать кэш видео (1080p)</span>
+                  </button>
+                  <span class="pixie-tip">
+                    <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                    <span class="pixie-tip-box" data-i18n="tip_video_pregen">Заранее перекодирует в кэш неподдерживаемые ролики (MKV/AVI/MTS и др.), а также видео выше 1080p (например, 4K), ограничивая их до 1080p для плавного воспроизведения.</span>
+                  </span>
+                </div>
+                <button type="button" onclick="cancelVideoPregenerate()" id="video-pregen-cancel-btn" class="hidden inline-flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2.5 text-xs tracking-[0.15em] uppercase transition">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="4" width="16" height="16"/></svg>
+                  <span data-i18n="btn_stop">Остановить</span>
+                </button>
+                <span id="video-pregen-status-text" class="text-xs text-stone-500"></span>
+              </div>
+              <div id="video-pregen-bar-wrap" class="hidden w-full bg-stone-200 dark:bg-stone-800 h-2 overflow-hidden">
+                <div id="video-pregen-bar" class="bg-stone-800 dark:bg-stone-200 h-full transition-all duration-300" style="width: 0%"></div>
               </div>
             </div>
           </div>
@@ -1215,6 +1252,11 @@
         tip_thumb_quality: 'Качество сжатия WEBP (1–100) для превью 400px и 1200px. Влияет на новые миниатюры; чтобы пересчитать старые, очистите кэш.',
         thumb_quality_400_label: '400px (по умолч. 80)',
         thumb_quality_1200_label: '1200px (по умолч. 85)',
+        lite_mode_label: 'Lite-режим (слабый NAS / ARM)',
+        tip_lite_mode: 'Снижает нагрузку на CPU и ОЗУ (подходит для ARM / 512 МБ–1 ГБ RAM): отключает перекодирование видео через FFmpeg и ограничивает генерацию миниатюр до 1 потока.',
+        btn_video_pregen: 'Создать кэш видео (1080p)',
+        tip_video_pregen: 'Заранее перекодирует в кэш неподдерживаемые ролики (MKV/AVI/MTS и др.), а также видео выше 1080p (например, 4K), ограничивая их до 1080p для плавного воспроизведения.',
+        video_transcode_disabled_lite: 'Перекодирование отключено в Lite-режиме',
         btn_optimize_cache: 'Оптимизировать кэш',
         optimizing_cache: 'Оптимизация...',
         optimize_done_prefix: 'Оптимизация завершена: удалено превью',
@@ -1428,6 +1470,11 @@
         tip_thumb_quality: 'WEBP compression quality (1–100) for 400px and 1200px previews. Applies to newly generated thumbnails; clear cache to regenerate existing ones.',
         thumb_quality_400_label: '400px (default 80)',
         thumb_quality_1200_label: '1200px (default 85)',
+        lite_mode_label: 'Lite Mode (low-power NAS / ARM)',
+        tip_lite_mode: 'Reduces CPU and RAM usage (for ARM / 512 MB–1 GB RAM): disables FFmpeg video transcoding and limits thumbnail generation to 1 worker thread.',
+        btn_video_pregen: 'Build Video Cache (1080p)',
+        tip_video_pregen: 'Pre-transcodes unsupported videos (MKV/AVI/MTS, etc.) and videos above 1080p (such as 4K) into 1080p cache for smooth playback.',
+        video_transcode_disabled_lite: 'Transcoding is disabled in Lite mode',
         btn_optimize_cache: 'Optimize Cache',
         optimizing_cache: 'Optimizing...',
         optimize_done_prefix: 'Optimization complete: removed previews',
@@ -1525,6 +1572,7 @@
     let currentRatio = localStorage.getItem('pixie_ratio') || 'original';
     let currentIndex = 0;
     let pregenPollTimer = null;
+    let videoPregenPollTimer = null;
     let exportPollTimer = null;
     let isSidebarCollapsed = false;
     let currentUserEditMode = 'allow';
@@ -2839,7 +2887,15 @@
               } else {
                 video.classList.add('hidden');
                 wrap.classList.remove('hidden');
-                document.getElementById('lb-btn-start-transcode').classList.remove('hidden');
+                const startBtn = document.getElementById('lb-btn-start-transcode');
+                const descEl = document.getElementById('lb-transcode-desc');
+                if (appSettings.lite_mode) {
+                  if (startBtn) startBtn.classList.add('hidden');
+                  if (descEl) descEl.textContent = t('video_transcode_disabled_lite');
+                } else {
+                  if (startBtn) startBtn.classList.remove('hidden');
+                  if (descEl) descEl.textContent = t('video_transcode_desc');
+                }
                 document.getElementById('lb-transcode-progress').classList.add('hidden');
               }
             }
@@ -2939,9 +2995,16 @@
         }
       });
 
+      img.addEventListener('click', (e) => {
+        if (!isZoomed && !didDragMove) {
+          e.preventDefault();
+          toggleZoom();
+        }
+      });
+
       img.addEventListener('dblclick', (e) => {
         e.preventDefault();
-        toggleZoom();
+        if (isZoomed) toggleZoom();
       });
 
       container.addEventListener('wheel', (e) => {
@@ -3105,12 +3168,16 @@
         if (q400El) q400El.value = appSettings.thumb_quality_400 !== undefined ? appSettings.thumb_quality_400 : 80;
         const q1200El = document.getElementById('opt-thumb-quality-1200');
         if (q1200El) q1200El.value = appSettings.thumb_quality_1200 !== undefined ? appSettings.thumb_quality_1200 : 85;
+        const liteEl = document.getElementById('opt-lite-mode');
+        if (liteEl) liteEl.checked = !!appSettings.lite_mode;
         document.getElementById('filter-saved-msg').classList.add('hidden');
         document.getElementById('title-saved-msg').classList.add('hidden');
         const vLimitMsg = document.getElementById('video-limit-saved-msg');
         if (vLimitMsg) vLimitMsg.classList.add('hidden');
         const tqMsg = document.getElementById('thumb-quality-saved-msg');
         if (tqMsg) tqMsg.classList.add('hidden');
+        const liteMsg = document.getElementById('lite-mode-saved-msg');
+        if (liteMsg) liteMsg.classList.add('hidden');
         const optResMsg = document.getElementById('optimize-result-msg');
         if (optResMsg) optResMsg.classList.add('hidden');
 
@@ -3131,6 +3198,7 @@
       if (isAdmin) {
         populateExportOptions();
         await pollPregenStatus();
+        await pollVideoPregenStatus();
         await pollExportStatus();
       }
     }
@@ -3304,6 +3372,10 @@
         clearInterval(pregenPollTimer);
         pregenPollTimer = null;
       }
+      if (videoPregenPollTimer) {
+        clearInterval(videoPregenPollTimer);
+        videoPregenPollTimer = null;
+      }
       if (exportPollTimer) {
         clearInterval(exportPollTimer);
         exportPollTimer = null;
@@ -3338,6 +3410,10 @@
         if (!Number.isNaN(q1200) && q1200 >= 1 && q1200 <= 100) {
           appSettings.thumb_quality_1200 = q1200;
         }
+      }
+      const liteEl = document.getElementById('opt-lite-mode');
+      if (liteEl) {
+        appSettings.lite_mode = !!liteEl.checked;
       }
 
       const res = await fetch('/api/settings', {
@@ -3383,6 +3459,90 @@
       if (msg) {
         msg.classList.remove('hidden');
         setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+    }
+
+    async function saveLiteModeSetting() {
+      await saveGalleryTitleOnly();
+      const msg = document.getElementById('lite-mode-saved-msg');
+      if (msg) {
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      }
+      await pollVideoPregenStatus();
+    }
+
+    async function triggerVideoPregenerate() {
+      const res = await fetch('/api/video/pregenerate', { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.detail || 'Error');
+        return;
+      }
+      await pollVideoPregenStatus();
+      if (videoPregenPollTimer) clearInterval(videoPregenPollTimer);
+      videoPregenPollTimer = setInterval(pollVideoPregenStatus, 1500);
+    }
+
+    async function cancelVideoPregenerate() {
+      await fetch('/api/video/pregenerate/cancel', { method: 'POST' });
+      const textEl = document.getElementById('video-pregen-status-text');
+      if (textEl) textEl.textContent = t('status_stopping');
+    }
+
+    async function pollVideoPregenStatus() {
+      const res = await fetch('/api/video/pregenerate/status');
+      if (!res.ok) return;
+      const st = await res.json();
+      const textEl = document.getElementById('video-pregen-status-text');
+      const wrapEl = document.getElementById('video-pregen-bar-wrap');
+      const barEl = document.getElementById('video-pregen-bar');
+      const actionBtn = document.getElementById('video-pregen-action-btn');
+      const cancelBtn = document.getElementById('video-pregen-cancel-btn');
+      if (!textEl || !wrapEl || !barEl || !actionBtn || !cancelBtn) return;
+
+      if (appSettings.lite_mode && !st.running) {
+        wrapEl.classList.add('hidden');
+        actionBtn.classList.remove('hidden');
+        actionBtn.disabled = true;
+        actionBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        cancelBtn.classList.add('hidden');
+        textEl.textContent = t('video_transcode_disabled_lite');
+        if (videoPregenPollTimer) {
+          clearInterval(videoPregenPollTimer);
+          videoPregenPollTimer = null;
+        }
+        return;
+      }
+
+      actionBtn.disabled = false;
+      actionBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+      if (st.running) {
+        wrapEl.classList.remove('hidden');
+        actionBtn.classList.add('hidden');
+        cancelBtn.classList.remove('hidden');
+        const pct = st.total > 0 ? Math.round((st.processed / st.total) * 100) : 0;
+        barEl.style.width = `${pct}%`;
+        const fileLabel = st.current_file === 'SCANNING' ? t('status_scanning') : st.current_file;
+        textEl.textContent = `${st.processed} / ${st.total} (${pct}%) — ${fileLabel}`;
+        const modalEl = document.getElementById('settings-modal');
+        if (!videoPregenPollTimer && modalEl && !modalEl.classList.contains('hidden')) {
+          videoPregenPollTimer = setInterval(pollVideoPregenStatus, 1500);
+        }
+      } else {
+        wrapEl.classList.add('hidden');
+        actionBtn.classList.remove('hidden');
+        cancelBtn.classList.add('hidden');
+        if (st.error) {
+          textEl.textContent = `Error: ${st.error}`;
+        } else if (textEl.textContent !== t('status_stopping')) {
+          textEl.textContent = t('status_ready');
+        }
+        if (videoPregenPollTimer) {
+          clearInterval(videoPregenPollTimer);
+          videoPregenPollTimer = null;
+        }
       }
     }
 

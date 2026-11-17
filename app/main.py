@@ -4,6 +4,7 @@ import json
 import time
 import hashlib
 import zipfile
+import tempfile
 import threading
 import subprocess
 import shutil
@@ -73,6 +74,16 @@ pregen_status = {
 }
 pregen_lock = threading.Lock()
 
+video_pregen_status = {
+    "running": False,
+    "cancel_requested": False,
+    "total": 0,
+    "processed": 0,
+    "current_file": "",
+    "error": ""
+}
+video_pregen_lock = threading.Lock()
+
 export_status = {
     "running": False,
     "cancel_requested": False,
@@ -89,6 +100,7 @@ db_lock = threading.Lock()
 exif_lock = threading.Lock()
 cleanup_lock = threading.Lock()
 thumb_semaphore = threading.Semaphore(2)
+lite_thumb_semaphore = threading.Semaphore(1)
 
 MAX_EXIF_CACHE_SIZE = 1000
 _exif_mem_cache: Optional[OrderedDict] = None
@@ -116,6 +128,7 @@ def default_settings_dict() -> dict:
         "video_cache_max_gb": DEFAULT_VIDEO_CACHE_MAX_GB,
         "thumb_quality_400": 80,
         "thumb_quality_1200": 85,
+        "lite_mode": False,
         "libraries": default_libraries_list()
     }
 
@@ -419,7 +432,9 @@ def generate_cached_thumb(orig_path: Path, size: int = 400, quality: Optional[in
     if cache_file.exists():
         return cache_file
 
-    with thumb_semaphore:
+    is_lite = bool(load_db().get("settings", {}).get("lite_mode", False))
+    sem = lite_thumb_semaphore if is_lite else thumb_semaphore
+    with sem:
         if not cache_file.exists():
             if quality is None:
                 q400, q1200 = _get_thumb_qualities()
@@ -848,6 +863,7 @@ class SettingsUpdateRequest(BaseModel):
     video_cache_max_gb: Optional[float] = None
     thumb_quality_400: Optional[int] = None
     thumb_quality_1200: Optional[int] = None
+    lite_mode: Optional[bool] = None
 
 
 class LibraryUpsertRequest(BaseModel):
@@ -950,6 +966,8 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
     prev_q400, prev_q1200 = _get_thumb_qualities(db)
     q400 = prev_q400 if req.thumb_quality_400 is None else max(1, min(100, int(req.thumb_quality_400)))
     q1200 = prev_q1200 if req.thumb_quality_1200 is None else max(1, min(100, int(req.thumb_quality_1200)))
+    prev_lite = bool(db.get("settings", {}).get("lite_mode", False))
+    lite_mode = prev_lite if req.lite_mode is None else bool(req.lite_mode)
     db["settings"] = {
         "gallery_title": req.gallery_title.strip(),
         "show_exif": req.show_exif,
@@ -961,6 +979,7 @@ def update_settings(req: SettingsUpdateRequest, user: dict = Depends(get_current
         "video_cache_max_gb": video_cache_max_gb,
         "thumb_quality_400": q400,
         "thumb_quality_1200": q1200,
+        "lite_mode": lite_mode,
         "libraries": existing_libs
     }
     save_db(db)
@@ -2080,9 +2099,42 @@ def get_album(album_path: str, lib: Optional[str] = "default", user: dict = Depe
     }
 
 
+def _cleanup_temp_file(path_str: str):
+    try:
+        Path(path_str).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _stream_temp_zip_response(
+    items: list[tuple[Path, str]],
+    download_filename: str,
+    background_tasks: BackgroundTasks
+) -> FileResponse:
+    """Write uncompressed ZIP to a temp file on disk and stream it to avoid RAM OOM."""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
+    tmp_path = tmp.name
+    tmp.close()
+    try:
+        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
+            for orig_path, arcname in items:
+                zf.write(orig_path, arcname=arcname)
+    except Exception:
+        _cleanup_temp_file(tmp_path)
+        raise
+    background_tasks.add_task(_cleanup_temp_file, tmp_path)
+    safe_filename = quote(download_filename)
+    return FileResponse(
+        tmp_path,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_filename}"}
+    )
+
+
 @app.get("/api/download-zip/{album_path:path}")
 def download_album_zip(
     album_path: str,
+    background_tasks: BackgroundTasks,
     favorites_only: bool = False,
     lib: Optional[str] = "default",
     user: dict = Depends(get_current_user)
@@ -2114,22 +2166,13 @@ def download_album_zip(
         items = [img for img in items if _is_fav(img)]
     if not items:
         raise HTTPException(status_code=404, detail="No media files to download")
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_STORED) as zf:
-        for it in items:
-            zf.write(it, arcname=it.name)
-    zip_buffer.seek(0)
     suffix = "_favorites" if favorites_only else ""
-    safe_filename = quote(f"{target_dir.name}{suffix}.zip")
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_filename}"}
-    )
+    return _stream_temp_zip_response([(it, it.name) for it in items], f"{target_dir.name}{suffix}.zip", background_tasks)
 
 
 @app.get("/api/download-favorites-zip")
 def download_favorites_zip(
+    background_tasks: BackgroundTasks,
     lib: Optional[str] = "default",
     media_type: str = "all",
     user: dict = Depends(get_current_user)
@@ -2173,23 +2216,12 @@ def download_favorites_zip(
     if not items:
         raise HTTPException(status_code=404, detail="No favorite media files to download")
 
-    zip_buffer = BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", compression=zipfile.ZIP_STORED) as zf:
-        for orig_path, rel_path in items:
-            zf.write(orig_path, arcname=rel_path)
-    zip_buffer.seek(0)
-
     suffix = ""
     if media_type == "photo":
         suffix = "_photos"
     elif media_type == "video":
         suffix = "_videos"
-    safe_filename = quote(f"favorites{suffix}.zip")
-    return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_filename}"}
-    )
+    return _stream_temp_zip_response(items, f"favorites{suffix}.zip", background_tasks)
 
 
 def _serve_thumbnail(img_path: str, target_size: int, user: dict, lib: Optional[str] = "default") -> FileResponse:
@@ -2266,7 +2298,18 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
     target_stream_file = orig_path
     media_type = "video/mp4"
 
-    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+    stat = orig_path.stat()
+    cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+    hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+    transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+    if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+        try:
+            os.utime(transcoded_file, None)
+        except Exception:
+            pass
+        target_stream_file = transcoded_file
+        media_type = "video/mp4"
+    elif ext in SUPPORTED_NATIVE_VIDEO_EXTS:
         if ext == ".webm":
             media_type = "video/webm"
         elif ext == ".mov":
@@ -2274,19 +2317,7 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
         else:
             media_type = "video/mp4"
     else:
-        stat = orig_path.stat()
-        cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
-        hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
-        transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
-        if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
-            try:
-                os.utime(transcoded_file, None)
-            except Exception:
-                pass
-            target_stream_file = transcoded_file
-            media_type = "video/mp4"
-        else:
-            raise HTTPException(status_code=422, detail="Video needs transcoding")
+        raise HTTPException(status_code=422, detail="Video needs transcoding")
 
     return range_file_response(request, target_stream_file, media_type)
 
@@ -2326,6 +2357,8 @@ def get_video_transcode_status(video_path: str, lib: Optional[str] = "default", 
 def trigger_video_transcode(video_path: str, background_tasks: BackgroundTasks, lib: Optional[str] = "default", user: dict = Depends(get_current_user)):
     rel_clean = unquote(video_path).strip("/")
     db = load_db()
+    if db.get("settings", {}).get("lite_mode", False):
+        raise HTTPException(status_code=403, detail="Video transcoding is disabled in Lite mode")
     lib_id, _, _ = get_library_root(lib, db)
     if not user_can_access_image(user, rel_clean, lib_id):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -2349,3 +2382,142 @@ def trigger_video_transcode(video_path: str, background_tasks: BackgroundTasks, 
 
     background_tasks.add_task(transcode_video_worker, orig_path, transcoded_file, hash_str)
     return {"status": "started", "is_native": False}
+
+
+def _collect_videos_needing_cache(db: dict) -> list[tuple[Path, Path, str]]:
+    """Collect (orig_path, output_file, hash_str) for unsupported or >1080p videos not yet cached."""
+    ex_exts, ex_masks, hidden_folders = get_filter_rules(db)
+    libs = get_libraries_list(db)
+    tasks_list = []
+    meta_dirty = False
+
+    for lib in libs:
+        lid = lib.get("id", "default")
+        try:
+            _, lib_root, _ = get_library_root(lid, db)
+        except Exception:
+            continue
+        if not lib_root.exists():
+            continue
+        for root, dirs, files in os.walk(lib_root):
+            current_dir = Path(root)
+            if current_dir != lib_root:
+                rel = current_dir.relative_to(lib_root).as_posix()
+                if is_folder_hidden(rel, hidden_folders, lid):
+                    dirs[:] = []
+                    continue
+            dirs[:] = [
+                d for d in dirs
+                if not d.startswith(".")
+                and not any(fnmatch(d.lower(), mask) for mask in ex_masks)
+            ]
+            for f in files:
+                p = Path(root) / f
+                if not is_valid_media(p, ex_exts, ex_masks):
+                    continue
+                ext = p.suffix.lower()
+                if ext not in SUPPORTED_VIDEO_EXTS:
+                    continue
+
+                needs_transcode = ext not in SUPPORTED_NATIVE_VIDEO_EXTS
+                if not needs_transcode:
+                    meta, updated = extract_video_metadata(p)
+                    if updated:
+                        meta_dirty = True
+                    w = int(meta.get("width", 0) or 0)
+                    h = int(meta.get("height", 0) or 0)
+                    if w > 1920 or h > 1080:
+                        needs_transcode = True
+
+                if not needs_transcode:
+                    continue
+
+                stat = p.stat()
+                cache_key = f"{p}_{stat.st_mtime}_1080p_v1"
+                hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+                out_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+                if out_file.exists() and out_file.stat().st_size > 0:
+                    continue
+                tasks_list.append((p, out_file, hash_str))
+
+    if meta_dirty:
+        save_video_meta_cache()
+    return tasks_list
+
+
+def run_all_video_cache_task():
+    global video_pregen_status
+    db = load_db()
+    if db.get("settings", {}).get("lite_mode", False):
+        with video_pregen_lock:
+            video_pregen_status["running"] = False
+            video_pregen_status["cancel_requested"] = False
+            video_pregen_status["current_file"] = "DISABLED"
+        return
+
+    tasks_list = _collect_videos_needing_cache(db)
+    with video_pregen_lock:
+        video_pregen_status["total"] = len(tasks_list)
+        video_pregen_status["processed"] = 0
+
+    for idx, (orig_path, out_file, hash_str) in enumerate(tasks_list, start=1):
+        with video_pregen_lock:
+            if video_pregen_status["cancel_requested"]:
+                break
+            video_pregen_status["current_file"] = orig_path.name
+
+        try:
+            transcode_video_worker(orig_path, out_file, hash_str)
+        except Exception as exc:
+            with video_pregen_lock:
+                video_pregen_status["error"] = str(exc)
+
+        with video_pregen_lock:
+            video_pregen_status["processed"] = idx
+        gc.collect()
+
+    with video_pregen_lock:
+        video_pregen_status["running"] = False
+        video_pregen_status["cancel_requested"] = False
+        video_pregen_status["current_file"] = "DONE"
+    gc.collect()
+
+
+@app.post("/api/video/pregenerate")
+def start_video_pregenerate(background_tasks: BackgroundTasks, user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    db = load_db()
+    if db.get("settings", {}).get("lite_mode", False):
+        raise HTTPException(status_code=403, detail="Video transcoding is disabled in Lite mode")
+    with video_pregen_lock:
+        if video_pregen_status["running"]:
+            return {"status": "already_running", "progress": video_pregen_status.copy()}
+        video_pregen_status["running"] = True
+        video_pregen_status["cancel_requested"] = False
+        video_pregen_status["processed"] = 0
+        video_pregen_status["total"] = 0
+        video_pregen_status["current_file"] = "SCANNING"
+        video_pregen_status["error"] = ""
+    background_tasks.add_task(run_all_video_cache_task)
+    return {"status": "started", "progress": video_pregen_status.copy()}
+
+
+@app.post("/api/video/pregenerate/cancel")
+def cancel_video_pregenerate(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    with video_pregen_lock:
+        video_pregen_status["cancel_requested"] = True
+        video_pregen_status["running"] = False
+    return {"status": "canceled"}
+
+
+@app.get("/api/video/pregenerate/status")
+def get_video_pregenerate_status(user: dict = Depends(get_current_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Admin only")
+    with video_pregen_lock:
+        res = video_pregen_status.copy()
+    res.update(get_cache_size_breakdown())
+    return res
