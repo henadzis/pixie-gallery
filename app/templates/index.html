@@ -566,7 +566,7 @@
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span data-i18n="tab_users">Пользователи</span>
           </button>
-          <button type="button" data-settings-tab="exports" onclick="switchSettingsTab('exports')" class="admin-only-setting settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
+          <button type="button" id="settings-tab-exports" data-settings-tab="exports" onclick="switchSettingsTab('exports')" class="settings-tab-btn whitespace-nowrap flex items-center gap-2 px-3 py-2 text-xs tracking-wider uppercase border border-stone-200 dark:border-stone-800 bg-white dark:bg-[#1e1e1e] hover:border-stone-400 dark:hover:border-stone-600 transition text-left">
             <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span data-i18n="tab_exports">Экспорт</span>
           </button>
@@ -1022,13 +1022,13 @@
               <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 space-y-4">
                 <p class="text-xs text-stone-500 dark:text-stone-400 leading-relaxed" data-i18n="exports_desc">Собирает все избранные файлы выбранного пользователя в ZIP-архивы без сжатия (уровень 0) и сохраняет их в папку экспорта на NAS. При превышении лимита архив автоматически разбивается на независимые части.</p>
 
-                <div class="text-xs text-stone-600 dark:text-stone-300 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2 flex flex-wrap items-center gap-2">
+                <div id="export-dir-box" class="admin-only-setting text-xs text-stone-600 dark:text-stone-300 bg-white dark:bg-[#121212] border border-stone-200 dark:border-stone-700 px-3 py-2 flex flex-wrap items-center gap-2">
                   <span class="font-semibold uppercase tracking-wider text-stone-500" data-i18n="exports_dir_label">Папка на сервере:</span>
                   <code id="export-dir-path" class="font-mono text-[11px] break-all">/exports</code>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div class="space-y-1">
+                  <div id="export-user-wrap" class="admin-only-setting space-y-1">
                     <label for="export-user-select" class="text-xs font-semibold uppercase tracking-wider text-stone-600 dark:text-stone-400" data-i18n="exports_user_label">Пользователь</label>
                     <select id="export-user-select" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs"></select>
                   </div>
@@ -1361,7 +1361,11 @@
         btn_record_hotkey: 'Назначить',
         btn_record_hotkey_listening: 'Жду клавишу…',
         hotkey_press_any: 'Нажмите нужную клавишу на клавиатуре (Esc — отмена)…',
-        hotkey_reserved: 'Эта клавиша используется для навигации. Выберите другую.'
+        hotkey_reserved: 'Эта клавиша используется для навигации. Выберите другую.',
+        exports_busy_other: 'Сейчас создаётся архив другого пользователя. Подождите немного…',
+        btn_download_archive: 'Скачать',
+        video_codec_unsupported_title: 'Кодек видео не поддерживается браузером',
+        video_codec_unsupported_desc: 'Браузер не смог воспроизвести этот видеофайл напрямую. Нажмите кнопку ниже, чтобы перекодировать ролик в кэш (1080p MP4 H.264/AAC) для плавного просмотра.'
       },
       en: {
         login_subtitle: 'Client Gallery Login',
@@ -1593,7 +1597,11 @@
         btn_record_hotkey: 'Bind',
         btn_record_hotkey_listening: 'Press key…',
         hotkey_press_any: 'Press any key on your keyboard (Esc to cancel)…',
-        hotkey_reserved: 'This key is reserved for navigation. Please choose another.'
+        hotkey_reserved: 'This key is reserved for navigation. Please choose another.',
+        exports_busy_other: 'Another user archive export is in progress. Please wait…',
+        btn_download_archive: 'Download',
+        video_codec_unsupported_title: 'Video codec not supported by browser',
+        video_codec_unsupported_desc: 'Your browser cannot play this video file directly. Click below to transcode it into cache (1080p MP4 H.264/AAC) for smooth playback.'
       }
     };
 
@@ -2860,8 +2868,18 @@
         }
       }
       const lb = document.getElementById('lightbox');
-      if (!lb.classList.contains('hidden') && displayedPhotos[currentIndex]) {
-        updateLightbox(false);
+      if (lb && !lb.classList.contains('hidden')) {
+        if (showOnlyFavorites) {
+          if (!displayedPhotos.length) {
+            closeLightbox();
+          } else {
+            currentIndex = Math.min(currentIndex, displayedPhotos.length - 1);
+            resetZoomState();
+            updateLightbox(true);
+          }
+        } else if (displayedPhotos[currentIndex]) {
+          updateLightbox(false);
+        }
       }
     }
 
@@ -3046,7 +3064,8 @@
               const wrap = document.getElementById('lb-transcode-wrap');
               wrap.classList.add('hidden');
               video.classList.remove('hidden');
-              video.src = current.stream_url;
+              const streamSep = current.stream_url.includes('?') ? '&' : '?';
+              video.src = `${current.stream_url}${streamSep}_t=${Date.now()}`;
               video.play().catch(() => {});
             } else if (data.status === 'error') {
               clearInterval(transcodePollTimer);
@@ -3098,22 +3117,12 @@
               } else if (data.status === 'processing') {
                 video.classList.add('hidden');
                 wrap.classList.remove('hidden');
+                document.getElementById('lb-transcode-title').textContent = t('video_transcode_title');
                 document.getElementById('lb-btn-start-transcode').classList.add('hidden');
                 document.getElementById('lb-transcode-progress').classList.remove('hidden');
                 pollTranscodeStatus(item.path);
               } else {
-                video.classList.add('hidden');
-                wrap.classList.remove('hidden');
-                const startBtn = document.getElementById('lb-btn-start-transcode');
-                const descEl = document.getElementById('lb-transcode-desc');
-                if (appSettings.lite_mode) {
-                  if (startBtn) startBtn.classList.add('hidden');
-                  if (descEl) descEl.textContent = t('video_transcode_disabled_lite');
-                } else {
-                  if (startBtn) startBtn.classList.remove('hidden');
-                  if (descEl) descEl.textContent = t('video_transcode_desc');
-                }
-                document.getElementById('lb-transcode-progress').classList.add('hidden');
+                showLightboxTranscodePrompt(false);
               }
             }
           } catch (e) {
@@ -3179,9 +3188,74 @@
       }
     }
 
+    function showLightboxTranscodePrompt(isCodecFallback = false) {
+      const video = document.getElementById('lb-video');
+      const wrap = document.getElementById('lb-transcode-wrap');
+      const titleEl = document.getElementById('lb-transcode-title');
+      const descEl = document.getElementById('lb-transcode-desc');
+      const startBtn = document.getElementById('lb-btn-start-transcode');
+      const prog = document.getElementById('lb-transcode-progress');
+      const badge = document.getElementById('lb-res-badge');
+      if (video) {
+        video.pause();
+        video.classList.add('hidden');
+      }
+      if (wrap) wrap.classList.remove('hidden');
+      if (badge) badge.textContent = 'TRANSCODE';
+      if (titleEl) {
+        titleEl.textContent = isCodecFallback ? t('video_codec_unsupported_title') : t('video_transcode_title');
+      }
+      if (appSettings.lite_mode) {
+        if (startBtn) startBtn.classList.add('hidden');
+        if (descEl) descEl.textContent = t('video_transcode_disabled_lite');
+      } else {
+        if (startBtn) startBtn.classList.remove('hidden');
+        if (descEl) {
+          descEl.textContent = isCodecFallback ? t('video_codec_unsupported_desc') : t('video_transcode_desc');
+        }
+      }
+      if (prog) prog.classList.add('hidden');
+    }
+
     (function setupLightboxInteractions() {
       const container = document.getElementById('lb-image-container');
       const img = document.getElementById('lb-image');
+      const video = document.getElementById('lb-video');
+
+      async function handleVideoUnsupportedFallback() {
+        const lb = document.getElementById('lightbox');
+        if (!lb || lb.classList.contains('hidden')) return;
+        const item = displayedPhotos[currentIndex];
+        if (!item || item.media_type !== 'video') return;
+        if (!video.getAttribute('src')) return;
+        try {
+          const res = await fetch(`/api/video/status/${encodeURIComponent(item.path)}?lib=${encodeURIComponent(currentLibraryId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'processing') {
+              video.pause();
+              video.classList.add('hidden');
+              document.getElementById('lb-transcode-wrap').classList.remove('hidden');
+              document.getElementById('lb-btn-start-transcode').classList.add('hidden');
+              document.getElementById('lb-transcode-progress').classList.remove('hidden');
+              pollTranscodeStatus(item.path);
+              return;
+            }
+          }
+        } catch (e) {}
+        showLightboxTranscodePrompt(true);
+      }
+
+      if (video) {
+        video.addEventListener('error', () => {
+          handleVideoUnsupportedFallback();
+        });
+        video.addEventListener('loadedmetadata', () => {
+          if (video.videoWidth === 0 && video.videoHeight === 0) {
+            handleVideoUnsupportedFallback();
+          }
+        });
+      }
 
       img.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
@@ -3357,10 +3431,14 @@
 
     async function openSettingsModal() {
       const isAdmin = currentUser && currentUser.role === 'admin';
+      const canExport = isAdmin || !!appSettings.allow_zip_download;
       document.querySelectorAll('.admin-only-setting').forEach(el => {
         el.classList.toggle('hidden', !isAdmin);
       });
-      if (!isAdmin && activeSettingsTab !== 'appearance' && activeSettingsTab !== 'maintenance') {
+      const exportsTabBtn = document.getElementById('settings-tab-exports');
+      if (exportsTabBtn) exportsTabBtn.classList.toggle('hidden', !canExport);
+      const allowedNonAdminTabs = canExport ? ['appearance', 'maintenance', 'exports'] : ['appearance', 'maintenance'];
+      if (!isAdmin && !allowedNonAdminTabs.includes(activeSettingsTab)) {
         switchSettingsTab('appearance');
       } else if (!document.getElementById(`settings-panel-${activeSettingsTab}`)) {
         switchSettingsTab('appearance');
@@ -3414,11 +3492,13 @@
         await loadUsersList();
       }
       document.getElementById('settings-modal').classList.remove('hidden');
-      if (isAdmin) {
+      if (canExport) {
         populateExportOptions();
+        await pollExportStatus();
+      }
+      if (isAdmin) {
         await pollPregenStatus();
         await pollVideoPregenStatus();
-        await pollExportStatus();
       }
     }
 
@@ -3878,33 +3958,47 @@
     }
 
     function populateExportOptions() {
+      const isAdmin = currentUser && currentUser.role === 'admin';
       const userSel = document.getElementById('export-user-select');
       const libSel = document.getElementById('export-lib-select');
-      if (userSel && Array.isArray(adminUsersList)) {
-        const prevUser = userSel.value;
-        userSel.innerHTML = adminUsersList.map(u => {
-          const favCnt = u.favorites_count || 0;
-          return `<option value="${u.username}">${u.username} (${favCnt})</option>`;
-        }).join('');
-        if (prevUser && adminUsersList.some(u => u.username === prevUser)) {
-          userSel.value = prevUser;
+      if (userSel) {
+        if (isAdmin && Array.isArray(adminUsersList)) {
+          const prevUser = userSel.value;
+          userSel.innerHTML = adminUsersList.map(u => {
+            const favCnt = u.favorites_count || 0;
+            return `<option value="${u.username}">${u.username} (${favCnt})</option>`;
+          }).join('');
+          if (prevUser && adminUsersList.some(u => u.username === prevUser)) {
+            userSel.value = prevUser;
+          }
+        } else if (currentUser) {
+          userSel.innerHTML = `<option value="${currentUser.username}">${currentUser.username}</option>`;
+          userSel.value = currentUser.username;
         }
       }
-      if (libSel && Array.isArray(adminLibraries)) {
-        const prevLib = libSel.value || 'all';
-        let html = `<option value="all">${t('exports_all_libs')}</option>`;
-        for (const lib of adminLibraries) {
+      const libsSource = isAdmin ? adminLibraries : availableLibraries;
+      if (libSel && Array.isArray(libsSource)) {
+        const prevLib = libSel.value || (libsSource.length === 1 ? libsSource[0].id : 'all');
+        let html = libsSource.length > 1 ? `<option value="all">${t('exports_all_libs')}</option>` : '';
+        for (const lib of libsSource) {
           html += `<option value="${lib.id}">${lib.name}</option>`;
         }
         libSel.innerHTML = html;
-        if (prevLib === 'all' || adminLibraries.some(l => l.id === prevLib)) {
+        if (prevLib === 'all' && libsSource.length > 1) {
+          libSel.value = 'all';
+        } else if (libsSource.some(l => l.id === prevLib)) {
           libSel.value = prevLib;
+        } else if (libsSource.length > 0) {
+          libSel.value = libsSource[0].id;
         }
       }
     }
 
     async function startExportFavorites() {
-      const username = document.getElementById('export-user-select')?.value;
+      const isAdmin = currentUser && currentUser.role === 'admin';
+      const username = isAdmin
+        ? document.getElementById('export-user-select')?.value
+        : (currentUser ? currentUser.username : '');
       const lib = document.getElementById('export-lib-select')?.value || 'all';
       const media_type = document.getElementById('export-media-select')?.value || 'all';
       const maxPartRaw = parseFloat(document.getElementById('export-part-gb')?.value || '2');
@@ -3948,15 +4042,23 @@
       if (dirEl && st.exports_dir) dirEl.textContent = st.exports_dir;
 
       if (st.running) {
-        wrapEl.classList.remove('hidden');
-        actionBtn.classList.add('hidden');
-        cancelBtn.classList.remove('hidden');
-        if (resBox) resBox.classList.add('hidden');
-        const pct = st.total > 0 ? Math.round((st.processed / st.total) * 100) : 0;
-        barEl.style.width = `${pct}%`;
-        const fileLabel = st.current_file === 'PREPARING' ? t('exports_preparing') : st.current_file;
-        const partLabel = st.current_part > 0 ? ` [${t('exports_part_short')} ${st.current_part}]` : '';
-        textEl.textContent = `${st.username}: ${st.processed} / ${st.total} (${pct}%)${partLabel} — ${fileLabel}`;
+        if (st.busy_by_other) {
+          wrapEl.classList.add('hidden');
+          actionBtn.classList.add('hidden');
+          cancelBtn.classList.add('hidden');
+          if (resBox) resBox.classList.add('hidden');
+          textEl.textContent = t('exports_busy_other');
+        } else {
+          wrapEl.classList.remove('hidden');
+          actionBtn.classList.add('hidden');
+          cancelBtn.classList.remove('hidden');
+          if (resBox) resBox.classList.add('hidden');
+          const pct = st.total > 0 ? Math.round((st.processed / st.total) * 100) : 0;
+          barEl.style.width = `${pct}%`;
+          const fileLabel = st.current_file === 'PREPARING' ? t('exports_preparing') : st.current_file;
+          const partLabel = st.current_part > 0 ? ` [${t('exports_part_short')} ${st.current_part}]` : '';
+          textEl.textContent = `${st.username}: ${st.processed} / ${st.total} (${pct}%)${partLabel} — ${fileLabel}`;
+        }
         const modalEl = document.getElementById('settings-modal');
         if (!exportPollTimer && modalEl && !modalEl.classList.contains('hidden')) {
           exportPollTimer = setInterval(pollExportStatus, 1500);
@@ -3966,9 +4068,11 @@
         actionBtn.classList.remove('hidden');
         cancelBtn.classList.add('hidden');
         if (st.error) {
-          textEl.textContent = `Error: ${st.error}`;
+          const writtenInfo = typeof st.written === 'number' ? ` (${st.written} / ${st.total})` : '';
+          textEl.textContent = `Error${writtenInfo}: ${st.error}`;
         } else if (st.current_file === 'DONE' && Array.isArray(st.created_files) && st.created_files.length > 0) {
-          textEl.textContent = `${t('exports_done')} (${st.processed} / ${st.total})`;
+          const writtenCnt = typeof st.written === 'number' ? st.written : st.processed;
+          textEl.textContent = `${t('exports_done')} (${writtenCnt} / ${st.total})`;
         } else if (textEl.textContent !== t('status_stopping')) {
           textEl.textContent = t('status_ready');
         }
@@ -3976,7 +4080,15 @@
         if (resBox && resList) {
           if (Array.isArray(st.created_files) && st.created_files.length > 0) {
             resBox.classList.remove('hidden');
-            resList.innerHTML = st.created_files.map(fn => `<li>• ${fn}</li>`).join('');
+            resList.innerHTML = st.created_files.map(fn => `
+              <li class="flex items-center justify-between gap-2 py-0.5">
+                <span class="truncate">• ${fn}</span>
+                <a href="/api/exports/download/${encodeURIComponent(fn)}" download class="shrink-0 inline-flex items-center gap-1 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 px-2 py-0.5 text-[10px] font-sans uppercase tracking-wider text-stone-700 dark:text-stone-200 transition">
+                  <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>${t('btn_download_archive')}</span>
+                </a>
+              </li>
+            `).join('');
           } else {
             resBox.classList.add('hidden');
           }

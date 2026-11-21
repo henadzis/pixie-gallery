@@ -108,6 +108,8 @@ export_status = {
     "cancel_requested": False,
     "total": 0,
     "processed": 0,
+    "written": 0,
+    "skipped": 0,
     "current_file": "",
     "current_part": 0,
     "username": "",
@@ -115,7 +117,7 @@ export_status = {
     "error": ""
 }
 export_lock = threading.Lock()
-db_lock = threading.Lock()
+db_lock = threading.RLock()
 exif_lock = threading.Lock()
 cleanup_lock = threading.Lock()
 thumb_semaphore = threading.Semaphore(2)
@@ -201,8 +203,10 @@ def load_db() -> dict:
 
 def save_db(data: dict):
     with db_lock:
-        with open(DB_FILE, "w", encoding="utf-8") as f:
+        tmp_file = DB_FILE.with_suffix(".tmp")
+        with open(tmp_file, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
+        tmp_file.replace(DB_FILE)
 
 
 def get_libraries_list(db: Optional[dict] = None) -> list:
@@ -1442,34 +1446,36 @@ def delete_user(uname: str, user: dict = Depends(get_current_user)):
 @app.post("/api/favorites/toggle")
 def toggle_favorite(req: FavoriteToggleRequest, user: dict = Depends(get_current_user)):
     rel_clean = unquote(req.photo_path).strip("/")
-    db = load_db()
-    lib_id, _, _ = get_library_root(req.lib, db)
-    if not user_can_access_image(user, rel_clean, lib_id):
-        raise HTTPException(status_code=403, detail="Access denied")
-    orig_path = safe_resolve(rel_clean, lib_id, db)
-    ex_exts, ex_masks, _ = get_filter_rules(db)
-    if not is_valid_media(orig_path, ex_exts, ex_masks):
-        raise HTTPException(status_code=404, detail="File not found")
-    uname = user["username"]
-    user_favs = set(db.setdefault("favorites", {}).get(uname, []))
-    fav_key = rel_clean if lib_id == "default" else f"{lib_id}::{rel_clean}"
-    if fav_key in user_favs:
-        user_favs.remove(fav_key)
-        is_favorite = False
-    else:
-        user_favs.add(fav_key)
-        is_favorite = True
-    db["favorites"][uname] = sorted(list(user_favs))
-    save_db(db)
+    with db_lock:
+        db = load_db()
+        lib_id, _, _ = get_library_root(req.lib, db)
+        if not user_can_access_image(user, rel_clean, lib_id):
+            raise HTTPException(status_code=403, detail="Access denied")
+        orig_path = safe_resolve(rel_clean, lib_id, db)
+        ex_exts, ex_masks, _ = get_filter_rules(db)
+        if not is_valid_media(orig_path, ex_exts, ex_masks):
+            raise HTTPException(status_code=404, detail="File not found")
+        uname = user["username"]
+        user_favs = set(db.setdefault("favorites", {}).get(uname, []))
+        fav_key = rel_clean if lib_id == "default" else f"{lib_id}::{rel_clean}"
+        if fav_key in user_favs:
+            user_favs.remove(fav_key)
+            is_favorite = False
+        else:
+            user_favs.add(fav_key)
+            is_favorite = True
+        db["favorites"][uname] = sorted(list(user_favs))
+        save_db(db)
     return {"status": "ok", "photo_path": rel_clean, "lib": lib_id, "is_favorite": is_favorite}
 
 
 @app.post("/api/favorites/clear")
 def clear_favorites(user: dict = Depends(get_current_user)):
-    db = load_db()
-    uname = user["username"]
-    db.setdefault("favorites", {})[uname] = []
-    save_db(db)
+    with db_lock:
+        db = load_db()
+        uname = user["username"]
+        db.setdefault("favorites", {})[uname] = []
+        save_db(db)
     return {"status": "ok"}
 
 
@@ -1594,29 +1600,55 @@ def get_pregenerate_status(user: dict = Depends(get_current_user)):
 
 
 class ExportFavoritesRequest(BaseModel):
-    username: str
+    username: Optional[str] = None
     lib: str = "all"
     media_type: str = "all"
     max_part_gb: float = 2.0
+
+
+def _sanitize_archive_segment(name: str, fallback: str = "archive") -> str:
+    cleaned = re.sub(r'[\\/:*?"<>|\x00-\x1f]+', "_", (name or "").strip())
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ._")
+    return cleaned or fallback
+
+
+def _get_library_display_name(lib_id: str, db: dict) -> str:
+    for lib in get_libraries_list(db):
+        if lib.get("id") == lib_id:
+            name = (lib.get("name") or "").strip()
+            if name and name.lower() != "default":
+                return name
+            break
+    return "Основной архив" if lib_id == "default" else lib_id
 
 
 def _collect_user_favorites_for_export(
     target_username: str,
     lib_scope: str,
     media_type: str,
-    db: dict
+    db: dict,
+    acting_user: Optional[dict] = None
 ) -> list[tuple[Path, str]]:
     """Collect (orig_path, arcname) pairs for a user's favorite files."""
     ex_exts, ex_masks, _ = get_filter_rules(db)
+    known_lib_ids = {lib.get("id", "default") for lib in get_libraries_list(db)}
     user_favs = db.get("favorites", {}).get(target_username, [])
+    enforce_access = acting_user is not None and acting_user.get("role") != "admin"
     items = []
     for fk in sorted(user_favs):
         if "::" in fk:
-            lib_id, rel_path = fk.split("::", 1)
+            cand_lib, cand_rel = fk.split("::", 1)
+            if cand_lib in known_lib_ids:
+                lib_id, rel_path = cand_lib, cand_rel
+            else:
+                lib_id, rel_path = "default", fk
         else:
             lib_id, rel_path = "default", fk
 
         if lib_scope != "all" and lib_id != lib_scope:
+            continue
+
+        if enforce_access and not user_can_access_image(acting_user, rel_path, lib_id):
             continue
 
         try:
@@ -1632,7 +1664,11 @@ def _collect_user_favorites_for_export(
         if media_type == "video" and ext not in SUPPORTED_VIDEO_EXTS:
             continue
 
-        arcname = f"{lib_id}/{rel_path}" if lib_scope == "all" else rel_path
+        if lib_scope == "all":
+            lib_folder = _sanitize_archive_segment(_get_library_display_name(lib_id, db), "library")
+            arcname = f"{lib_folder}/{rel_path}"
+        else:
+            arcname = rel_path
         items.append((orig_path, arcname))
     return items
 
@@ -1641,6 +1677,7 @@ def run_export_favorites_task(
     items: list[tuple[Path, str]],
     username: str,
     lib_scope: str,
+    lib_display_name: str,
     media_type: str,
     max_part_gb: float
 ):
@@ -1654,8 +1691,11 @@ def run_export_favorites_task(
     try:
         EXPORTS_DIR.mkdir(parents=True, exist_ok=True)
         ts = time.strftime("%Y-%m-%d_%H-%M-%S")
-        safe_user = re.sub(r"[^a-zA-Z0-9_.-]+", "_", username).strip("_") or "user"
-        safe_lib = re.sub(r"[^a-zA-Z0-9_.-]+", "_", lib_scope).strip("_") or "all"
+        safe_user = _sanitize_archive_segment(username, "user").replace(" ", "_")
+        if lib_scope == "all":
+            safe_lib = "all"
+        else:
+            safe_lib = _sanitize_archive_segment(lib_display_name, "library").replace(" ", "_")
         safe_type = media_type if media_type in ("all", "photo", "video") else "all"
         base_name = f"{safe_user}_{safe_lib}_favorites_{safe_type}_{ts}"
 
@@ -1667,7 +1707,13 @@ def run_export_favorites_task(
             nonlocal zf, current_tmp_path, current_final_path
             current_tmp_path = EXPORTS_DIR / f".{base_name}_part{idx}.zip.tmp"
             current_final_path = EXPORTS_DIR / f"{base_name}_part{idx}.zip"
-            zf = zipfile.ZipFile(current_tmp_path, "w", compression=zipfile.ZIP_STORED, allowZip64=True)
+            zf = zipfile.ZipFile(
+                current_tmp_path,
+                "w",
+                compression=zipfile.ZIP_STORED,
+                allowZip64=True,
+                strict_timestamps=False
+            )
 
         def _close_part():
             nonlocal zf, current_tmp_path, current_final_path
@@ -1701,9 +1747,12 @@ def run_export_favorites_task(
 
                 zf.write(orig_path, arcname=arcname)
                 current_part_bytes += fsize
+                with export_lock:
+                    export_status["written"] = export_status.get("written", 0) + 1
             except Exception as exc:
                 with export_lock:
-                    export_status["error"] = str(exc)
+                    export_status["skipped"] = export_status.get("skipped", 0) + 1
+                    export_status["error"] = f"{orig_path.name}: {exc}"
 
             with export_lock:
                 export_status["processed"] = idx
@@ -1759,26 +1808,38 @@ def start_export_favorites(
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
     db = load_db()
-    target_user = req.username.strip()
+    is_admin = user["role"] == "admin"
+    if not is_admin and not db.get("settings", {}).get("allow_zip_download", True):
+        raise HTTPException(status_code=403, detail="ZIP download disabled")
+
+    target_user = (req.username or "").strip() if is_admin else user["username"]
+    if not target_user:
+        target_user = user["username"]
     if target_user not in db.get("users", {}):
         raise HTTPException(status_code=404, detail="User not found")
 
-    items = _collect_user_favorites_for_export(target_user, req.lib, req.media_type, db)
+    if not is_admin and req.lib != "all" and not user_can_access_library(user, req.lib):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    items = _collect_user_favorites_for_export(target_user, req.lib, req.media_type, db, acting_user=user)
     if not items:
         raise HTTPException(status_code=404, detail="No favorite media files to export")
 
     max_part_gb = max(0.0, float(req.max_part_gb or 0.0))
+    lib_display_name = "all" if req.lib == "all" else _get_library_display_name(req.lib, db)
 
     with export_lock:
         if export_status["running"]:
+            if not is_admin and export_status.get("username") != user["username"]:
+                raise HTTPException(status_code=409, detail="Another archive export is currently in progress")
             return {"status": "already_running", "progress": export_status.copy()}
         export_status["running"] = True
         export_status["cancel_requested"] = False
         export_status["total"] = len(items)
         export_status["processed"] = 0
+        export_status["written"] = 0
+        export_status["skipped"] = 0
         export_status["current_file"] = "PREPARING"
         export_status["current_part"] = 1
         export_status["username"] = target_user
@@ -1790,6 +1851,7 @@ def start_export_favorites(
         items,
         target_user,
         req.lib,
+        lib_display_name,
         req.media_type,
         max_part_gb
     )
@@ -1798,9 +1860,9 @@ def start_export_favorites(
 
 @app.post("/api/exports/cancel")
 def cancel_export_favorites(user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
     with export_lock:
+        if user["role"] != "admin" and export_status.get("username") != user["username"]:
+            raise HTTPException(status_code=403, detail="Access denied")
         export_status["cancel_requested"] = True
         export_status["running"] = False
     return {"status": "canceled"}
@@ -1808,12 +1870,76 @@ def cancel_export_favorites(user: dict = Depends(get_current_user)):
 
 @app.get("/api/exports/status")
 def get_export_status(user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
+    is_admin = user["role"] == "admin"
     with export_lock:
         res = export_status.copy()
-    res["exports_dir"] = str(EXPORTS_DIR)
+
+    if is_admin:
+        res["exports_dir"] = str(EXPORTS_DIR)
+        res["busy_by_other"] = False
+        return res
+
+    if res.get("username") != user["username"]:
+        if res.get("running"):
+            return {
+                "running": True,
+                "busy_by_other": True,
+                "total": 0,
+                "processed": 0,
+                "written": 0,
+                "skipped": 0,
+                "current_file": "",
+                "current_part": 0,
+                "username": "",
+                "created_files": [],
+                "error": ""
+            }
+        return {
+            "running": False,
+            "busy_by_other": False,
+            "total": 0,
+            "processed": 0,
+            "written": 0,
+            "skipped": 0,
+            "current_file": "",
+            "current_part": 0,
+            "username": user["username"],
+            "created_files": [],
+            "error": ""
+        }
+
+    res["busy_by_other"] = False
     return res
+
+
+@app.get("/api/exports/download/{filename}")
+def download_export_file(filename: str, user: dict = Depends(get_current_user)):
+    db = load_db()
+    is_admin = user["role"] == "admin"
+    if not is_admin and not db.get("settings", {}).get("allow_zip_download", True):
+        raise HTTPException(status_code=403, detail="ZIP download disabled")
+
+    clean_name = Path(unquote(filename)).name
+    if not clean_name or clean_name != unquote(filename) or not clean_name.lower().endswith(".zip") or clean_name.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    if not is_admin:
+        safe_user = _sanitize_archive_segment(user["username"], "user").replace(" ", "_")
+        with export_lock:
+            own_created = export_status.get("username") == user["username"] and clean_name in export_status.get("created_files", [])
+        if not own_created and not clean_name.startswith(f"{safe_user}_"):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    target = (EXPORTS_DIR / clean_name).resolve()
+    if not str(target).startswith(str(EXPORTS_DIR)) or not target.is_file():
+        raise HTTPException(status_code=404, detail="Archive not found")
+
+    safe_dl = quote(clean_name)
+    return FileResponse(
+        target,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{safe_dl}"}
+    )
 
 
 def scan_all_albums_recursive(
@@ -2135,7 +2261,13 @@ def _stream_temp_zip_response(
     tmp_path = tmp.name
     tmp.close()
     try:
-        with zipfile.ZipFile(tmp_path, "w", compression=zipfile.ZIP_STORED, allowZip64=True) as zf:
+        with zipfile.ZipFile(
+            tmp_path,
+            "w",
+            compression=zipfile.ZIP_STORED,
+            allowZip64=True,
+            strict_timestamps=False
+        ) as zf:
             for orig_path, arcname in items:
                 zf.write(orig_path, arcname=arcname)
     except Exception:
@@ -2240,7 +2372,8 @@ def download_favorites_zip(
         suffix = "_photos"
     elif media_type == "video":
         suffix = "_videos"
-    return _stream_temp_zip_response(items, f"favorites{suffix}.zip", background_tasks)
+    lib_display = _sanitize_archive_segment(_get_library_display_name(lib_id, db), "favorites").replace(" ", "_")
+    return _stream_temp_zip_response(items, f"{lib_display}_favorites{suffix}.zip", background_tasks)
 
 
 def _serve_thumbnail(img_path: str, target_size: int, user: dict, lib: Optional[str] = "default") -> FileResponse:
@@ -2317,7 +2450,19 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
     target_stream_file = orig_path
     media_type = "video/mp4"
 
-    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+    stat = orig_path.stat()
+    cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
+    hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
+    transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
+
+    if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
+        try:
+            os.utime(transcoded_file, None)
+        except Exception:
+            pass
+        target_stream_file = transcoded_file
+        media_type = "video/mp4"
+    elif ext in SUPPORTED_NATIVE_VIDEO_EXTS:
         if ext == ".webm":
             media_type = "video/webm"
         elif ext == ".mov":
@@ -2325,19 +2470,7 @@ def stream_video(video_path: str, request: Request, lib: Optional[str] = "defaul
         else:
             media_type = "video/mp4"
     else:
-        stat = orig_path.stat()
-        cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
-        hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
-        transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
-        if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
-            try:
-                os.utime(transcoded_file, None)
-            except Exception:
-                pass
-            target_stream_file = transcoded_file
-            media_type = "video/mp4"
-        else:
-            raise HTTPException(status_code=422, detail="Video needs transcoding")
+        raise HTTPException(status_code=422, detail="Video needs transcoding")
 
     return range_file_response(request, target_stream_file, media_type)
 
@@ -2354,21 +2487,21 @@ def get_video_transcode_status(video_path: str, lib: Optional[str] = "default", 
         raise HTTPException(status_code=404, detail="File not found")
 
     ext = orig_path.suffix.lower()
-    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
-        return {"status": "ready", "is_native": True}
-
     stat = orig_path.stat()
     cache_key = f"{orig_path}_{stat.st_mtime}_1080p_v1"
     hash_str = hashlib.md5(cache_key.encode("utf-8")).hexdigest()
     transcoded_file = VIDEO_CACHE_DIR / f"{hash_str}.mp4"
 
     if transcoded_file.exists() and transcoded_file.stat().st_size > 0:
-        return {"status": "ready", "is_native": False}
+        return {"status": "ready", "is_native": False, "transcoded": True}
 
     with video_transcode_lock:
         state = video_transcode_status.get(hash_str)
         if state:
             return {"status": state.get("status", "idle"), "is_native": False, "error": state.get("error")}
+
+    if ext in SUPPORTED_NATIVE_VIDEO_EXTS:
+        return {"status": "ready", "is_native": True, "transcoded": False}
 
     return {"status": "needs_transcoding", "is_native": False}
 
