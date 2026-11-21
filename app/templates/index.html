@@ -630,12 +630,34 @@
                     <option value="crop" data-i18n="ratio_crop">Ровная плитка (4:3)</option>
                   </select>
                 </div>
-                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4 sm:col-span-2">
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
                   <label class="block text-xs font-medium uppercase tracking-wider mb-2" data-i18n="nav_language">Язык</label>
                   <select id="pref-lang" onchange="changeLanguage(this.value)" class="w-full border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
                     <option value="ru">Русский</option>
                     <option value="en">English</option>
                   </select>
+                </div>
+                <div class="bg-stone-50 dark:bg-[#202020] border border-stone-200 dark:border-stone-800 p-4">
+                  <label class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wider mb-2">
+                    <span data-i18n="settings_fav_hotkey">Горячая клавиша «Избранное»</span>
+                    <span class="pixie-tip">
+                      <button type="button" class="pixie-tip-btn" aria-label="Info" onclick="togglePixieTip(event, this)">i</button>
+                      <span class="pixie-tip-box" data-i18n="tip_fav_hotkey">Нажатие этой клавиши добавляет или убирает кадр из избранного в полноэкранном просмотре (лайтбоксе) и при наведении курсора на фото в сетке альбома.</span>
+                    </span>
+                  </label>
+                  <div class="flex items-center gap-2">
+                    <select id="pref-fav-hotkey" onchange="handleFavHotkeySelectChange(this.value)" class="flex-grow min-w-0 border border-stone-300 dark:border-stone-700 bg-white dark:bg-[#121212] px-3 py-2 text-xs">
+                      <option value="Alt" data-i18n="hotkey_alt">Option (⌥) / Alt</option>
+                      <option value="Space" data-i18n="hotkey_space">Пробел (Space)</option>
+                      <option value="KeyF" data-i18n="hotkey_f">Клавиша F (А)</option>
+                      <option value="KeyL" data-i18n="hotkey_l">Клавиша L (Д)</option>
+                      <option value="Shift" data-i18n="hotkey_shift">Shift (⇧)</option>
+                      <option value="custom" id="pref-fav-hotkey-custom-opt" data-i18n="hotkey_custom">Своя клавиша…</option>
+                      <option value="none" data-i18n="hotkey_none">Отключено</option>
+                    </select>
+                    <button type="button" id="btn-record-fav-hotkey" onclick="toggleRecordFavHotkey()" class="shrink-0 border border-stone-300 dark:border-stone-700 hover:border-stone-800 dark:hover:border-stone-300 bg-white dark:bg-[#121212] px-3 py-2 text-xs uppercase tracking-wider transition" data-i18n="btn_record_hotkey">Назначить</button>
+                  </div>
+                  <div id="fav-hotkey-record-hint" class="hidden text-[11px] text-amber-600 dark:text-amber-400 mt-1.5" data-i18n="hotkey_press_any">Нажмите нужную клавишу на клавиатуре (Esc — отмена)…</div>
                 </div>
               </div>
             </div>
@@ -1326,7 +1348,20 @@
         switch_library_title: 'Выбрать библиотеку',
         user_default_lib: 'Библиотека по умолчанию',
         lib_default_auto: 'Автоматически (первая доступная)',
-        badge_default_lib: 'по умолч.'
+        badge_default_lib: 'по умолч.',
+        settings_fav_hotkey: 'Горячая клавиша «Избранное»',
+        tip_fav_hotkey: 'Нажатие этой клавиши добавляет или убирает кадр из избранного в полноэкранном просмотре (лайтбоксе) и при наведении курсора на фото в сетке альбома.',
+        hotkey_alt: 'Option (⌥) / Alt',
+        hotkey_space: 'Пробел (Space)',
+        hotkey_f: 'Клавиша F (А)',
+        hotkey_l: 'Клавиша L (Д)',
+        hotkey_shift: 'Shift (⇧)',
+        hotkey_custom: 'Своя клавиша…',
+        hotkey_none: 'Отключено',
+        btn_record_hotkey: 'Назначить',
+        btn_record_hotkey_listening: 'Жду клавишу…',
+        hotkey_press_any: 'Нажмите нужную клавишу на клавиатуре (Esc — отмена)…',
+        hotkey_reserved: 'Эта клавиша используется для навигации. Выберите другую.'
       },
       en: {
         login_subtitle: 'Client Gallery Login',
@@ -1545,7 +1580,20 @@
         switch_library_title: 'Select Library',
         user_default_lib: 'Default Library',
         lib_default_auto: 'Auto (first available)',
-        badge_default_lib: 'default'
+        badge_default_lib: 'default',
+        settings_fav_hotkey: 'Favorite Hotkey',
+        tip_fav_hotkey: 'Pressing this key toggles Favorite status in the fullscreen lightbox and when hovering over a photo in the album grid.',
+        hotkey_alt: 'Option (⌥) / Alt',
+        hotkey_space: 'Spacebar',
+        hotkey_f: 'F key',
+        hotkey_l: 'L key',
+        hotkey_shift: 'Shift (⇧)',
+        hotkey_custom: 'Custom key…',
+        hotkey_none: 'Disabled',
+        btn_record_hotkey: 'Bind',
+        btn_record_hotkey_listening: 'Press key…',
+        hotkey_press_any: 'Press any key on your keyboard (Esc to cancel)…',
+        hotkey_reserved: 'This key is reserved for navigation. Please choose another.'
       }
     };
 
@@ -1576,6 +1624,12 @@
     let showOnlyFavorites = false;
     let currentSort = localStorage.getItem('pixie_sort') || 'name_asc';
     let currentRatio = localStorage.getItem('pixie_ratio') || 'original';
+    let currentFavHotkey = localStorage.getItem('pixie_fav_hotkey') || 'Alt';
+    let currentFavHotkeyLabel = localStorage.getItem('pixie_fav_hotkey_label') || '';
+    let isRecordingFavHotkey = false;
+    let hoveredPhotoPath = '';
+    const FAV_HOTKEY_PRESETS = ['Alt', 'Space', 'KeyF', 'KeyL', 'Shift', 'none'];
+    const FAV_HOTKEY_RESERVED = new Set(['Escape', 'ArrowLeft', 'ArrowRight', 'Tab']);
     let currentIndex = 0;
     let pregenPollTimer = null;
     let videoPregenPollTimer = null;
@@ -1621,6 +1675,7 @@
         el.title = t(key);
       });
       updateRatioButtonLabel();
+      updateFavHotkeyUI();
       renderLibrarySwitcher();
       if (allYears.length) {
         renderSidebarTree(currentAlbumPath);
@@ -1662,8 +1717,133 @@
       document.getElementById('pref-gap').value = savedGap;
       document.getElementById('pref-ratio').value = currentRatio;
       document.getElementById('album-sort-select').value = currentSort;
+      updateFavHotkeyUI();
       updateMediaTypeFilterUI();
       applyTranslations();
+    }
+
+    function getFavHotkeyDisplayName() {
+      if (currentFavHotkey === 'none') return '';
+      if (currentFavHotkey === 'Alt') return t('hotkey_alt');
+      if (currentFavHotkey === 'Space') return t('hotkey_space');
+      if (currentFavHotkey === 'KeyF') return 'F';
+      if (currentFavHotkey === 'KeyL') return 'L';
+      if (currentFavHotkey === 'Shift') return 'Shift';
+      return currentFavHotkeyLabel || currentFavHotkey;
+    }
+
+    function getFavButtonTitle() {
+      const keyName = getFavHotkeyDisplayName();
+      return keyName ? `${t('fav_add')} (${keyName})` : t('fav_add');
+    }
+
+    function updateFavHotkeyUI() {
+      const sel = document.getElementById('pref-fav-hotkey');
+      const customOpt = document.getElementById('pref-fav-hotkey-custom-opt');
+      const recBtn = document.getElementById('btn-record-fav-hotkey');
+      const hint = document.getElementById('fav-hotkey-record-hint');
+      if (customOpt) {
+        const isCustom = !FAV_HOTKEY_PRESETS.includes(currentFavHotkey);
+        customOpt.textContent = isCustom
+          ? `${t('hotkey_custom').replace('…', '')}: ${currentFavHotkeyLabel || currentFavHotkey}`
+          : t('hotkey_custom');
+      }
+      if (sel) {
+        sel.value = FAV_HOTKEY_PRESETS.includes(currentFavHotkey) ? currentFavHotkey : 'custom';
+      }
+      if (recBtn) {
+        recBtn.textContent = isRecordingFavHotkey ? t('btn_record_hotkey_listening') : t('btn_record_hotkey');
+        recBtn.classList.toggle('border-amber-500', isRecordingFavHotkey);
+        recBtn.classList.toggle('text-amber-600', isRecordingFavHotkey);
+        recBtn.classList.toggle('dark:text-amber-400', isRecordingFavHotkey);
+      }
+      if (hint) {
+        hint.classList.toggle('hidden', !isRecordingFavHotkey);
+        if (isRecordingFavHotkey) hint.textContent = t('hotkey_press_any');
+      }
+      const lbFavBtn = document.getElementById('lb-fav-btn');
+      if (lbFavBtn) lbFavBtn.title = getFavButtonTitle();
+      document.querySelectorAll('#photos-grid button[data-fav-btn]').forEach(btn => {
+        btn.title = getFavButtonTitle();
+      });
+    }
+
+    function setFavHotkey(code, label = '') {
+      currentFavHotkey = code || 'Alt';
+      currentFavHotkeyLabel = label || '';
+      localStorage.setItem('pixie_fav_hotkey', currentFavHotkey);
+      localStorage.setItem('pixie_fav_hotkey_label', currentFavHotkeyLabel);
+      isRecordingFavHotkey = false;
+      updateFavHotkeyUI();
+    }
+
+    function handleFavHotkeySelectChange(val) {
+      if (val === 'custom') {
+        startRecordFavHotkey();
+        return;
+      }
+      setFavHotkey(val, '');
+    }
+
+    function startRecordFavHotkey() {
+      isRecordingFavHotkey = true;
+      updateFavHotkeyUI();
+    }
+
+    function stopRecordFavHotkey() {
+      isRecordingFavHotkey = false;
+      updateFavHotkeyUI();
+    }
+
+    function toggleRecordFavHotkey() {
+      if (isRecordingFavHotkey) {
+        stopRecordFavHotkey();
+      } else {
+        startRecordFavHotkey();
+      }
+    }
+
+    function formatCapturedHotkeyLabel(e) {
+      if (e.key === 'Alt') return 'Option (⌥) / Alt';
+      if (e.key === 'Shift') return 'Shift (⇧)';
+      if (e.key === 'Control') return 'Ctrl';
+      if (e.key === 'Meta') return 'Cmd / Meta';
+      if (e.code === 'Space' || e.key === ' ') return 'Space';
+      if (e.code && e.code.startsWith('Key')) return e.code.slice(3).toUpperCase();
+      if (e.code && e.code.startsWith('Digit')) return e.code.slice(5);
+      if (e.key && e.key.length === 1) return e.key.toUpperCase();
+      return e.code || e.key;
+    }
+
+    function matchesFavHotkey(e) {
+      if (!currentFavHotkey || currentFavHotkey === 'none') return false;
+      if (currentFavHotkey === 'Alt') {
+        return (e.key === 'Alt' || e.code === 'AltLeft' || e.code === 'AltRight') && !e.ctrlKey && !e.metaKey && !e.shiftKey;
+      }
+      if (currentFavHotkey === 'Shift') {
+        return (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') && !e.ctrlKey && !e.metaKey && !e.altKey;
+      }
+      if (currentFavHotkey === 'Control') {
+        return (e.key === 'Control' || e.code === 'ControlLeft' || e.code === 'ControlRight') && !e.altKey && !e.metaKey && !e.shiftKey;
+      }
+      if (currentFavHotkey === 'Meta') {
+        return (e.key === 'Meta' || e.code === 'MetaLeft' || e.code === 'MetaRight') && !e.ctrlKey && !e.altKey && !e.shiftKey;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return false;
+      if (currentFavHotkey === 'Space') {
+        return e.code === 'Space' || e.key === ' ';
+      }
+      return e.code === currentFavHotkey || e.key === currentFavHotkey;
+    }
+
+    function setHoveredPhotoPath(encodedPath) {
+      hoveredPhotoPath = encodedPath || '';
+    }
+
+    function clearHoveredPhotoPath(encodedPath) {
+      if (hoveredPhotoPath === encodedPath) {
+        hoveredPhotoPath = '';
+      }
     }
 
     function changeTheme(theme, save = true) {
@@ -2583,9 +2763,12 @@
 
       const isCrop = currentRatio === 'crop';
       grid.className = isCrop ? 'photo-grid' : 'justified-grid';
+      const favBtnTitle = getFavButtonTitle();
 
-      grid.innerHTML = displayedPhotos.map((p, idx) => `
-        <div class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
+      grid.innerHTML = displayedPhotos.map((p, idx) => {
+        const encPath = encodeURIComponent(p.path);
+        return `
+        <div data-photo-path="${encPath}" onmouseenter="setHoveredPhotoPath('${encPath}')" onmouseleave="clearHoveredPhotoPath('${encPath}')" class="group relative overflow-hidden bg-stone-100 dark:bg-stone-800 flex items-center justify-center ${isCrop ? 'aspect-[4/3]' : 'justified-item'}">
           <img src="${p.thumb}" loading="lazy" decoding="async" alt="${p.name}" data-idx="${idx}" data-src="${p.thumb}"
                onload="onThumbLoaded(this, ${isCrop})"
                onerror="onThumbError(this)"
@@ -2612,11 +2795,12 @@
             <span class="text-[10px] mt-1.5 uppercase tracking-wider text-stone-400 font-medium">${t('thumb_retry')}</span>
           </div>
           <div class="absolute inset-0 bg-sky-500/0 group-hover:bg-sky-500/25 transition-colors duration-300 pointer-events-none"></div>
-          <button onclick="toggleFavoriteByPath(event, '${encodeURIComponent(p.path)}')" title="${t('fav_add')}" class="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
+          <button data-fav-btn="${encPath}" onclick="toggleFavoriteByPath(event, '${encPath}')" title="${favBtnTitle}" class="absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${p.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}">
             ${p.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline}
           </button>
         </div>
-      `).join('');
+      `;
+      }).join('');
 
       initThumbObserver();
       document.querySelectorAll('#photos-grid img[data-src]').forEach(img => {
@@ -2647,7 +2831,34 @@
       }
       renderSidebarTree(currentAlbumPath);
       updateAlbumHeaderCount();
-      renderAlbumPhotos();
+      if (showOnlyFavorites) {
+        hoveredPhotoPath = '';
+        renderAlbumPhotos();
+      } else {
+        const favPhotos = currentPhotos.filter(p => p.is_favorite);
+        const favBadge = document.getElementById('fav-counter-badge');
+        if (favBadge) favBadge.textContent = favPhotos.length;
+        const favActionsBar = document.getElementById('fav-actions-bar');
+        const favZipBtn = document.getElementById('album-fav-zip-btn');
+        if (favActionsBar && favZipBtn) {
+          if (favPhotos.length > 0) {
+            favActionsBar.classList.remove('hidden');
+            if (appSettings.allow_zip_download || (currentUser && currentUser.role === 'admin')) {
+              favZipBtn.href = `/api/download-zip/${currentAlbumPathEncoded}?favorites_only=true&lib=${encodeURIComponent(currentLibraryId)}`;
+              favZipBtn.classList.remove('hidden');
+            } else {
+              favZipBtn.classList.add('hidden');
+            }
+          } else {
+            favActionsBar.classList.add('hidden');
+          }
+        }
+        const btn = document.querySelector(`#photos-grid button[data-fav-btn="${CSS.escape(encodedPhotoPath)}"]`);
+        if (btn) {
+          btn.innerHTML = data.is_favorite ? SVG_ICONS.heartActive : SVG_ICONS.heartOutline;
+          btn.className = `absolute top-3 right-3 z-10 w-9 h-9 rounded-full bg-white/90 dark:bg-black/80 hover:bg-white shadow-sm flex items-center justify-center transition ${data.is_favorite ? 'text-red-500 opacity-100' : 'text-stone-600 dark:text-stone-300 opacity-80 sm:opacity-0 group-hover:opacity-100'}`;
+        }
+      }
       const lb = document.getElementById('lightbox');
       if (!lb.classList.contains('hidden') && displayedPhotos[currentIndex]) {
         updateLightbox(false);
@@ -2928,6 +3139,8 @@
       document.getElementById('lb-counter').textContent = `${currentIndex + 1} / ${displayedPhotos.length}`;
       document.getElementById('lb-filename').textContent = item.name;
 
+      const favBtn = document.getElementById('lb-fav-btn');
+      if (favBtn) favBtn.title = getFavButtonTitle();
       const favIcon = document.getElementById('lb-fav-icon');
       const favLabel = document.getElementById('lb-fav-label');
       if (item.is_favorite) {
@@ -3373,6 +3586,7 @@
     }
 
     function closeSettingsModal() {
+      stopRecordFavHotkey();
       document.getElementById('settings-modal').classList.add('hidden');
       if (pregenPollTimer) {
         clearInterval(pregenPollTimer);
@@ -4154,11 +4368,77 @@
     }
 
     window.addEventListener('keydown', (e) => {
+      // Режим записи пользовательской горячей клавиши в настройках
+      if (isRecordingFavHotkey) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === 'Escape') {
+          stopRecordFavHotkey();
+          return;
+        }
+        if (FAV_HOTKEY_RESERVED.has(e.key) || FAV_HOTKEY_RESERVED.has(e.code)) {
+          const hint = document.getElementById('fav-hotkey-record-hint');
+          if (hint) {
+            hint.textContent = t('hotkey_reserved');
+            hint.classList.remove('hidden');
+          }
+          return;
+        }
+        let capturedCode = e.code || e.key;
+        if (e.key === 'Alt') capturedCode = 'Alt';
+        else if (e.key === 'Shift') capturedCode = 'Shift';
+        else if (e.key === 'Control') capturedCode = 'Control';
+        else if (e.key === 'Meta') capturedCode = 'Meta';
+        else if (e.code === 'Space' || e.key === ' ') capturedCode = 'Space';
+        setFavHotkey(capturedCode, formatCapturedHotkeyLabel(e));
+        return;
+      }
+
       const lb = document.getElementById('lightbox');
-      if (lb.classList.contains('hidden')) return;
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight') stepPhoto(1);
-      if (e.key === 'ArrowLeft') stepPhoto(-1);
+      const isLightboxOpen = lb && !lb.classList.contains('hidden');
+
+      if (isLightboxOpen) {
+        if (e.key === 'Escape') { closeLightbox(); return; }
+        if (e.key === 'ArrowRight') { stepPhoto(1); return; }
+        if (e.key === 'ArrowLeft') { stepPhoto(-1); return; }
+      }
+
+      // Игнорируем автоповтор и ввод текста в полях
+      if (e.repeat) return;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'SELECT' || activeEl.isContentEditable)) {
+        return;
+      }
+
+      // Не срабатываем при открытых модалках или экране входа
+      const settingsModal = document.getElementById('settings-modal');
+      const pickerModal = document.getElementById('album-picker-modal');
+      const loginScreen = document.getElementById('login-screen');
+      if (
+        (settingsModal && !settingsModal.classList.contains('hidden')) ||
+        (pickerModal && !pickerModal.classList.contains('hidden')) ||
+        (loginScreen && !loginScreen.classList.contains('hidden'))
+      ) {
+        return;
+      }
+
+      if (!matchesFavHotkey(e)) return;
+
+      if (isLightboxOpen) {
+        e.preventDefault();
+        toggleFavoriteCurrentLightbox();
+        return;
+      }
+
+      const albumView = document.getElementById('album-view');
+      if (albumView && !albumView.classList.contains('hidden')) {
+        const hoveredCard = document.querySelector('#photos-grid [data-photo-path]:hover');
+        const targetEncodedPath = hoveredCard?.getAttribute('data-photo-path') || hoveredPhotoPath;
+        if (targetEncodedPath) {
+          e.preventDefault();
+          toggleFavoriteByPath(null, targetEncodedPath);
+        }
+      }
     });
 
     initApp();
